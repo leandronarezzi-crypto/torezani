@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar - Torezani Apoio Marítimo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="login-body">
+  <div class="login-screen">
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="img/logo-full.jpg" alt="Torezani Apoio Marítimo" class="login-logo-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="login-logo-fallback" style="display:none">
+          <span class="login-logo-fallback-mark">T</span>
+          <h1>Torezani</h1>
+          <p>Apoio Marítimo</p>
+        </div>
+      </div>
+
+      <div id="alert-box" class="login-alert hidden"></div>
+
+      <form id="form-login" class="login-form">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+          <input type="email" id="login-email" required class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="voce@empresa.com">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+          <input type="password" id="login-senha" required class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="••••••••">
+        </div>
+        <p id="login-error" class="text-sm text-red-600 hidden"></p>
+        <button type="submit" class="btn-primary w-full justify-center">Entrar</button>
+      </form>
+
+      <form id="form-registro" class="login-form hidden">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Nome</label>
+          <input type="text" id="registro-nome" required class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="Seu nome completo">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+          <input type="email" id="registro-email" required class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="voce@empresa.com">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+          <input type="password" id="registro-senha" required minlength="6" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="Mínimo 6 caracteres">
+        </div>
+        <p id="registro-error" class="text-sm text-red-600 hidden"></p>
+        <button type="submit" class="btn-primary w-full justify-center">Criar conta</button>
+      </form>
+
+      <div class="login-toggle">
+        <span id="toggle-para-registro">Não tem acesso? <a href="#">Criar conta</a></span>
+        <span id="toggle-para-login" class="hidden">Já tem conta? <a href="#">Entrar</a></span>
+      </div>
+      <p class="login-hint">Novas contas precisam ser liberadas por um administrador antes do primeiro acesso.</p>
+    </div>
+  </div>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

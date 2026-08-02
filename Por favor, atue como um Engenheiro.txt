@@ -1,0 +1,88 @@
+Por favor, atue como um Engenheiro de Software Sênior e Desenvolvedor Full-Stack. Preciso que você crie uma aplicação web completa para **Gerenciamento de Embarcação**, focada no controle de mecânica, propulsão, plano de manutenção preventiva por horímetro e histórico de cascos/pintura.
+
+Abaixo estão todas as especificações técnicas, arquitetura de dados e regras de negócio que o sistema deve conter.
+
+---
+
+### 1. Requisitos de Configuração e Arquitetura
+* **Suporte a Monomotor e Bimotor:** O sistema deve permitir configurar se a embarcação possui 1 motor (Monomotor) ou 2 motores (Bimotor - Bore/Babor e Estibordo). Se for bimotor, os dados mecânicos e horímetros devem ser duplicados e gerenciados de forma independente para cada máquina.
+* **Stack Tecnológica sugerida:** 
+  * Backend: Python com FastAPI (ou Node.js/Express, escolha a mais limpa e performática).
+  * Frontend: HTML5 / TailwindCSS com componentes interativos limpos (ou React, caso prefira estruturar em componentes).
+  * Banco de Dados: SQLite / PostgreSQL (conforme o esquema abaixo).
+
+---
+
+### 2. Esquema do Banco de Dados (SQL)
+
+Implemente o banco de dados considerando as seguintes tabelas e relacionamentos:
+
+```sql
+CREATE TABLE embarcacao (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    tipo_configuracao VARCHAR(20) CHECK (tipo_configuracao IN ('MONOMOTOR', 'BIMOTOR'))
+);
+
+CREATE TABLE motor (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    embarcacao_id INT,
+    posicao VARCHAR(20) CHECK (posicao IN ('MONO', 'BORE/BABOR', 'ESTIBORDO')),
+    marca VARCHAR(50),
+    modelo VARCHAR(50),
+    potencia_config VARCHAR(50),
+    num_serie VARCHAR(50),
+    horimetro_atual DECIMAL(10,2) DEFAULT 0.00,
+    FOREIGN KEY (embarcacao_id) REFERENCES embarcacao(id) ON DELETE CASCADE
+);
+
+CREATE TABLE caixa_reversora (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    motor_id INT,
+    marca VARCHAR(50),
+    modelo VARCHAR(50),
+    ratio VARCHAR(20),
+    FOREIGN KEY (motor_id) REFERENCES motor(id) ON DELETE CASCADE
+);
+
+CREATE TABLE sistema_eixo_helice (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    motor_id INT,
+    diametro_helice VARCHAR(20),
+    passo_helice VARCHAR(20),
+    num_pas INT,
+    diametro_eixo VARCHAR(20),
+    grau_cone VARCHAR(20),
+    comprimento_cone VARCHAR(20),
+    FOREIGN KEY (motor_id) REFERENCES motor(id) ON DELETE CASCADE
+);
+
+CREATE TABLE correia (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    motor_id INT,
+    funcao_aplicacao VARCHAR(100),
+    especificacao_tamanho VARCHAR(50),
+    quantidade INT DEFAULT 1,
+    FOREIGN KEY (motor_id) REFERENCES motor(id) ON DELETE CASCADE
+);
+
+CREATE TABLE manutencao_preventiva (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    motor_id INT,
+    tipo_servico VARCHAR(50), -- Ex: 'OLEO_MOTOR', 'FILTRO_LUB', 'FILTRO_DIESEL'
+    horimetro_ultima_troca DECIMAL(10,2),
+    intervalo_horas INT,
+    alerta_limite_horas INT, -- Ex: avisa faltando 50 horas
+    FOREIGN KEY (motor_id) REFERENCES motor(id) ON DELETE CASCADE
+);
+
+CREATE TABLE manutencao_casco_pintura (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    embarcacao_id INT,
+    tipo_intervencao VARCHAR(50) CHECK (tipo_intervencao IN ('CASCO', 'PINTURA')),
+    data_execucao DATE,
+    horimetro_embarcacao DECIMAL(10,2),
+    esquema_produtos TEXT,
+    historico_observacoes TEXT,
+    alerta_vencimento_data DATE -- Útil para tintas anti-incrustantes (ex: validade de 36 meses)
+);
