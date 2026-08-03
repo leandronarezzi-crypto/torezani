@@ -49,6 +49,17 @@ export default function UsuariosPage() {
     }
   }
 
+  async function excluirUsuario(usuario: Usuario) {
+    if (!window.confirm(`Excluir a conta de ${usuario.nome} (${usuario.email})? Esta ação não pode ser desfeita.`)) return;
+    setErroAcao(null);
+    try {
+      await api.delete(`/admin/usuarios/${usuario.id}`);
+      refetch();
+    } catch (err) {
+      setErroAcao(err instanceof ApiError ? err.message : 'Não foi possível excluir o usuário.');
+    }
+  }
+
   async function salvarEdicao(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editando) return;
@@ -139,6 +150,9 @@ export default function UsuariosPage() {
                           Bloquear
                         </button>
                       ) : null}
+                      <button disabled={isSelf} onClick={() => excluirUsuario(u)} className="text-xs font-semibold text-danger hover:underline disabled:opacity-40">
+                        Excluir
+                      </button>
                     </td>
                   </tr>
                 );

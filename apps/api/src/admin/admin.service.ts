@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
@@ -55,5 +55,20 @@ export class AdminService {
       },
       select: USER_SELECT,
     });
+  }
+
+  async deletarUsuario(id: number, solicitanteId: number) {
+    if (id === solicitanteId) throw new ForbiddenException('Você não pode excluir a própria conta');
+
+    const atual = await this.prisma.usuario.findUnique({ where: { id } });
+    if (!atual) throw new NotFoundException('Usuário não encontrado');
+
+    if (atual.papel === 'ADMIN') {
+      const outrosAdmins = await this.prisma.usuario.count({ where: { papel: 'ADMIN', id: { not: id } } });
+      if (outrosAdmins === 0) throw new ForbiddenException('Não é possível excluir o único administrador');
+    }
+
+    await this.prisma.usuario.delete({ where: { id } });
+    return { id };
   }
 }
