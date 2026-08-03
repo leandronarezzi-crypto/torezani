@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f1eff8;
+  --card: #ffffff;
+  --foreground: #1e1b3a;
+  --foreground-soft: #6b6690;
+  --line: #e1ddf0;
+
+  --accent: #5b3df0;
+  --accent-dark: #4a30d9;
+  --accent-soft: #eeeafd;
+
+  --gold: #c6a15b;
+  --gold-dark: #a9843f;
+
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+  --success: #15803d;
+  --success-soft: #ecfdf5;
+  --muted: #64748b;
+  --muted-soft: #f1f5f9;
+}
+
+.dark {
+  --background: #14101f;
+  --card: #201a38;
+  --foreground: #f2eff9;
+  --foreground-soft: #b3a9d1;
+  --line: #362c56;
+
+  --accent: #8c7bff;
+  --accent-dark: #7364e0;
+  --accent-soft: #2c2350;
+
+  --gold: #d9b06c;
+  --gold-dark: #c6a15b;
+
+  --danger: #e0806a;
+  --danger-soft: #3a1f1c;
+  --warn: #e0a34a;
+  --warn-soft: #3a2c14;
+  --success: #6cd490;
+  --success-soft: #143323;
+  --muted: #9aa3b5;
+  --muted-soft: #241f3b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-foreground-soft: var(--foreground-soft);
+  --color-line: var(--line);
+
+  --color-accent: var(--accent);
+  --color-accent-dark: var(--accent-dark);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-gold: var(--gold);
+  --color-gold-dark: var(--gold-dark);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-muted: var(--muted);
+  --color-muted-soft: var(--muted-soft);
+}
+
+* {
+  border-color: var(--line);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Papel VISUALIZADOR: some com qualquer ação de escrita marcada como .write-only. */
+.role-viewer .write-only {
+  display: none !important;
+}
+
+/* Impressão de relatórios: some com o chrome do app (sidebar, popups) e libera o
+   conteúdo do fluxo de altura fixa/scroll da shell para paginar normalmente no papel. */
+@media print {
+  .app-shell,
+  .app-main {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .app-shell > aside {
+    display: none !important;
+  }
+  .app-main {
+    padding: 0 !important;
+  }
+  @page {
+    margin: 14mm;
+  }
+}
+
+/* Leaflet precisa de altura explícita na árvore de pais; o CDN de ícones do marcador
+   é referenciado via classe abaixo porque o pacote leaflet não inclui os PNGs no bundle do Next. */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: var(--card);
+}

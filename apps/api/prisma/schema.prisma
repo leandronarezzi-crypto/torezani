@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Papel {
+  ADMIN
+  EDITOR
+  VISUALIZADOR
+}
+
+enum StatusUsuario {
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
+enum TipoConfiguracao {
+  MONOMOTOR
+  BIMOTOR
+}
+
+enum PosicaoMotor {
+  MONO
+  BORE_BABOR @map("BORE/BABOR")
+  ESTIBORDO
+}
+
+enum TipoIntervencao {
+  CASCO
+  PINTURA
+}
+
+model Usuario {
+  id        Int            @id @default(autoincrement())
+  nome      String         @db.VarChar(100)
+  email     String         @unique @db.VarChar(150)
+  senhaHash String         @map("senha_hash") @db.VarChar(200)
+  papel     Papel          @default(VISUALIZADOR)
+  status    StatusUsuario  @default(PENDENTE)
+  criadoEm  DateTime       @default(now()) @map("criado_em") @db.Timestamptz
+
+  notificacoesLidas NotificationRead[]
+  auditoriasCriadas Auditoria[]
+
+  @@map("usuario")
+}
+
+model Embarcacao {
+  id                      Int       @id @default(autoincrement())
+  nome                    String    @db.VarChar(100)
+  tipoConfiguracao        TipoConfiguracao @map("tipo_configuracao")
+  latitude                Decimal?  @db.Decimal(9, 6)
+  longitude               Decimal?  @db.Decimal(9, 6)
+  localizacaoAtualizadaEm DateTime? @map("localizacao_atualizada_em") @db.Timestamptz
+  criadoEm                DateTime  @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm            DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  motores      Motor[]
+  cascoPintura ManutencaoCascoPintura[]
+  auditorias   Auditoria[]
+
+  @@map("embarcacao")
+}
+
+model Motor {
+  id             Int          @id @default(autoincrement())
+  embarcacaoId   Int          @map("embarcacao_id")
+  posicao        PosicaoMotor
+  marca          String?      @db.VarChar(50)
+  modelo         String?      @db.VarChar(50)
+  potenciaConfig String?      @map("potencia_config") @db.VarChar(50)
+  numSerie       String?      @map("num_serie") @db.VarChar(50)
+  horimetroAtual Decimal      @default(0.00) @map("horimetro_atual") @db.Decimal(10, 2)
+  criadoEm       DateTime     @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm   DateTime     @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  embarcacao        Embarcacao          @relation(fields: [embarcacaoId], references: [id], onDelete: Cascade)
+  caixaReversora    CaixaReversora?
+  sistemaEixoHelice SistemaEixoHelice?
+  correias          Correia[]
+  manutencoes       ManutencaoPreventiva[]
+
+  @@index([embarcacaoId])
+  @@map("motor")
+}
+
+model CaixaReversora {
+  id           Int      @id @default(autoincrement())
+  motorId      Int      @unique @map("motor_id")
+  marca        String?  @db.VarChar(50)
+  modelo       String?  @db.VarChar(50)
+  ratio        String?  @db.VarChar(20)
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  motor Motor @relation(fields: [motorId], references: [id], onDelete: Cascade)
+
+  @@map("caixa_reversora")
+}
+
+model SistemaEixoHelice {
+  id              Int      @id @default(autoincrement())
+  motorId         Int      @unique @map("motor_id")
+  diametroHelice  String?  @map("diametro_helice") @db.VarChar(20)
+  passoHelice     String?  @map("passo_helice") @db.VarChar(20)
+  numPas          Int?     @map("num_pas")
+  diametroEixo    String?  @map("diametro_eixo") @db.VarChar(20)
+  grauCone        String?  @map("grau_cone") @db.VarChar(20)
+  comprimentoCone String?  @map("comprimento_cone") @db.VarChar(20)
+  criadoEm        DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm    DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  motor Motor @relation(fields: [motorId], references: [id], onDelete: Cascade)
+
+  @@map("sistema_eixo_helice")
+}
+
+model Correia {
+  id                   Int      @id @default(autoincrement())
+  motorId              Int      @map("motor_id")
+  funcaoAplicacao      String?  @map("funcao_aplicacao") @db.VarChar(100)
+  especificacaoTamanho String?  @map("especificacao_tamanho") @db.VarChar(50)
+  quantidade           Int      @default(1)
+  criadoEm             DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm         DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  motor Motor @relation(fields: [motorId], references: [id], onDelete: Cascade)
+
+  @@index([motorId])
+  @@map("correia")
+}
+
+model ManutencaoPreventiva {
+  id                   Int      @id @default(autoincrement())
+  motorId              Int      @map("motor_id")
+  tipoServico          String   @map("tipo_servico") @db.VarChar(50)
+  horimetroUltimaTroca Decimal  @default(0.00) @map("horimetro_ultima_troca") @db.Decimal(10, 2)
+  intervaloHoras       Int      @map("intervalo_horas")
+  alertaLimiteHoras    Int      @default(0) @map("alerta_limite_horas")
+  criadoEm             DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm         DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  motor Motor @relation(fields: [motorId], references: [id], onDelete: Cascade)
+
+  @@index([motorId])
+  @@map("manutencao_preventiva")
+}
+
+model ManutencaoCascoPintura {
+  id                   Int             @id @default(autoincrement())
+  embarcacaoId         Int             @map("embarcacao_id")
+  tipoIntervencao      TipoIntervencao @map("tipo_intervencao")
+  dataExecucao         DateTime?       @map("data_execucao") @db.Date
+  horimetroEmbarcacao  Decimal?        @map("horimetro_embarcacao") @db.Decimal(10, 2)
+  esquemaProdutos      String?         @map("esquema_produtos")
+  historicoObservacoes String?         @map("historico_observacoes")
+  alertaVencimentoData DateTime?       @map("alerta_vencimento_data") @db.Date
+  criadoEm             DateTime        @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm         DateTime        @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  embarcacao Embarcacao @relation(fields: [embarcacaoId], references: [id], onDelete: Cascade)
+
+  @@index([embarcacaoId])
+  @@map("manutencao_casco_pintura")
+}
+
+// Rastreia quais notificações computadas (ver notifications.service) cada usuário já leu.
+model NotificationRead {
+  id             Int      @id @default(autoincrement())
+  usuarioId      Int      @map("usuario_id")
+  notificationId String   @map("notification_id") @db.VarChar(80)
+  lidoEm         DateTime @default(now()) @map("lido_em") @db.Timestamptz
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, notificationId])
+  @@map("notification_read")
+}
+
+// Auditoria de manutenção: checklist preenchido em campo, escalável para qualquer embarcação
+// da frota. O modelo de itens (categoria + descrição) vem de checklist-template.ts; cada
+// auditoria grava uma cópia própria dos itens (concluido/observação) no momento em que foi feita.
+model Auditoria {
+  id                Int       @id @default(autoincrement())
+  embarcacaoId      Int       @map("embarcacao_id")
+  responsavel       String    @db.VarChar(150)
+  dataRealizacao    DateTime  @map("data_realizacao") @db.Date
+  horimetro         Decimal?  @db.Decimal(10, 2)
+  observacoesGerais String?   @map("observacoes_gerais")
+  criadoPorId       Int?      @map("criado_por_id")
+  criadoEm          DateTime  @default(now()) @map("criado_em") @db.Timestamptz
+
+  embarcacao Embarcacao      @relation(fields: [embarcacaoId], references: [id], onDelete: Cascade)
+  criadoPor  Usuario?        @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+  itens      AuditoriaItem[]
+
+  @@index([embarcacaoId])
+  @@map("auditoria")
+}
+
+model AuditoriaItem {
+  id          Int     @id @default(autoincrement())
+  auditoriaId Int     @map("auditoria_id")
+  categoria   String  @db.VarChar(50)
+  descricao   String
+  concluido   Boolean @default(false)
+  observacao  String?
+  ordem       Int     @default(0)
+
+  auditoria Auditoria @relation(fields: [auditoriaId], references: [id], onDelete: Cascade)
+
+  @@index([auditoriaId])
+  @@map("auditoria_item")
+}

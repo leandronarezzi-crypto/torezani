@@ -1,0 +1,52 @@
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { EmbarcacoesService } from './embarcacoes.service';
+import { CreateEmbarcacaoDto } from './dto/create-embarcacao.dto';
+import { UpdateEmbarcacaoDto } from './dto/update-embarcacao.dto';
+import { UpdateLocalizacaoDto } from './dto/update-localizacao.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { WriteGuard } from '../common/guards/write.guard';
+
+@ApiTags('embarcacoes')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, WriteGuard)
+@Controller('embarcacoes')
+export class EmbarcacoesController {
+  constructor(private readonly embarcacoesService: EmbarcacoesService) {}
+
+  @Get()
+  list() {
+    return this.embarcacoesService.list();
+  }
+
+  @Get(':id')
+  get(@Param('id', ParseIntPipe) id: number) {
+    return this.embarcacoesService.get(id);
+  }
+
+  @Get(':id/detail')
+  getDetail(@Param('id', ParseIntPipe) id: number) {
+    return this.embarcacoesService.getDetail(id);
+  }
+
+  @Post()
+  create(@Body() dto: CreateEmbarcacaoDto) {
+    return this.embarcacoesService.create(dto);
+  }
+
+  @Put(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEmbarcacaoDto) {
+    return this.embarcacoesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    await this.embarcacoesService.remove(id);
+  }
+
+  @Patch(':id/localizacao')
+  updateLocalizacao(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLocalizacaoDto) {
+    return this.embarcacoesService.updateLocalizacao(id, dto);
+  }
+}

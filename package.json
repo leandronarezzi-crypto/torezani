@@ -1,0 +1,19 @@
+{
+  "name": "torezani",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Torezani Apoio Marítimo — monorepo (NestJS + Prisma na API, Next.js no painel)",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:api": "npm run dev --workspace apps/api",
+    "dev:web": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/api && npm run build --workspace apps/web",
+    "db:up": "docker compose up -d",
+    "db:migrate": "npm run prisma:migrate --workspace apps/api",
+    "db:seed": "npm run prisma:seed --workspace apps/api"
+  }
+}
