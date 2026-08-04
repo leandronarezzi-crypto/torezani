@@ -138,7 +138,7 @@ model Correia {
 model ManutencaoPreventiva {
   id                   Int      @id @default(autoincrement())
   motorId              Int      @map("motor_id")
-  tipoServico          String   @map("tipo_servico") @db.VarChar(50)
+  tipoServico          String   @map("tipo_servico") @db.VarChar(255)
   horimetroUltimaTroca Decimal  @default(0.00) @map("horimetro_ultima_troca") @db.Decimal(10, 2)
   intervaloHoras       Int      @map("intervalo_horas")
   alertaLimiteHoras    Int      @default(0) @map("alerta_limite_horas")

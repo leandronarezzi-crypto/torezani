@@ -1,11 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
 
 export class UpsertManutencaoDto {
   @ApiProperty()
   @IsString()
   @MinLength(1, { message: 'tipoServico é obrigatório' })
+  @MaxLength(255, { message: 'tipoServico deve ter no máximo 255 caracteres' })
   tipoServico!: string;
 
   @ApiPropertyOptional()
