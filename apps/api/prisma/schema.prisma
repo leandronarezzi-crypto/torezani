@@ -106,12 +106,12 @@ model CaixaReversora {
 model SistemaEixoHelice {
   id              Int      @id @default(autoincrement())
   motorId         Int      @unique @map("motor_id")
-  diametroHelice  String?  @map("diametro_helice") @db.VarChar(20)
-  passoHelice     String?  @map("passo_helice") @db.VarChar(20)
+  diametroHelice  String?  @map("diametro_helice") @db.VarChar(50)
+  passoHelice     String?  @map("passo_helice") @db.VarChar(50)
   numPas          Int?     @map("num_pas")
-  diametroEixo    String?  @map("diametro_eixo") @db.VarChar(20)
-  grauCone        String?  @map("grau_cone") @db.VarChar(20)
-  comprimentoCone String?  @map("comprimento_cone") @db.VarChar(20)
+  diametroEixo    String?  @map("diametro_eixo") @db.VarChar(50)
+  grauCone        String?  @map("grau_cone") @db.VarChar(50)
+  comprimentoCone String?  @map("comprimento_cone") @db.VarChar(50)
   criadoEm        DateTime @default(now()) @map("criado_em") @db.Timestamptz
   atualizadoEm    DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
 

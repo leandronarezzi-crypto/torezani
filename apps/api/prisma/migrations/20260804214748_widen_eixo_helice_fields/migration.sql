@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "sistema_eixo_helice" ALTER COLUMN "diametro_helice" SET DATA TYPE VARCHAR(50),
+ALTER COLUMN "passo_helice" SET DATA TYPE VARCHAR(50),
+ALTER COLUMN "diametro_eixo" SET DATA TYPE VARCHAR(50),
+ALTER COLUMN "grau_cone" SET DATA TYPE VARCHAR(50),
+ALTER COLUMN "comprimento_cone" SET DATA TYPE VARCHAR(50);

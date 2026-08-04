@@ -1,12 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsDateString, IsNumber, IsOptional, IsString, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsDateString, IsNumber, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { CreateAuditoriaItemDto } from './create-auditoria-item.dto';
 
 export class CreateAuditoriaDto {
   @ApiProperty()
   @IsString()
   @MinLength(1, { message: 'Responsável é obrigatório' })
+  @MaxLength(150, { message: 'Responsável deve ter no máximo 150 caracteres' })
   responsavel!: string;
 
   @ApiProperty()

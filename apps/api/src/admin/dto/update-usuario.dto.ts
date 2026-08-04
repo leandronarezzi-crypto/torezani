@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Papel, StatusUsuario } from '@prisma/client';
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateUsuarioDto {
   @ApiPropertyOptional({ enum: Papel })
@@ -17,11 +17,13 @@ export class UpdateUsuarioDto {
   @IsOptional()
   @IsString()
   @MinLength(1, { message: 'Nome é obrigatório' })
+  @MaxLength(100, { message: 'Nome deve ter no máximo 100 caracteres' })
   nome?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsEmail({}, { message: 'E-mail inválido' })
+  @MaxLength(150, { message: 'E-mail deve ter no máximo 150 caracteres' })
   email?: string;
 
   @ApiPropertyOptional()
