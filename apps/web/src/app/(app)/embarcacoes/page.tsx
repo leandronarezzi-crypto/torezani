@@ -20,7 +20,12 @@ export default function EmbarcacoesPage() {
   }, [embarcacoes, busca]);
 
   async function excluir(v: Embarcacao) {
-    if (!window.confirm(`Excluir a embarcação "${v.nome}"? Todos os dados relacionados (motores, manutenções, histórico) serão removidos permanentemente.`)) return;
+    if (
+      !window.confirm(
+        `Excluir a embarcação "${v.nome}"?\n\nEla sai das listas e dos alertas, mas NADA é apagado: motores, manutenções e histórico continuam guardados e podem ser restaurados por um administrador.`,
+      )
+    )
+      return;
     setErroAcao(null);
     try {
       await api.delete(`/embarcacoes/${v.id}`);
@@ -86,6 +91,9 @@ export default function EmbarcacoesPage() {
                     <Badge>{TIPO_CONFIGURACAO_LABEL[v.tipoConfiguracao]}</Badge>
                   </td>
                   <td className="space-x-3 px-4 py-3 text-right">
+                    <Link href={`/embarcacoes/${v.id}/relatorio`} className="text-foreground-soft hover:text-accent">
+                      Relatório
+                    </Link>
                     <Link href={`/embarcacoes/${v.id}/editar`} className="write-only text-foreground-soft hover:text-accent">
                       Editar
                     </Link>

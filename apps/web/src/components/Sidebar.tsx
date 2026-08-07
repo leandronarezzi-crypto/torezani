@@ -38,6 +38,16 @@ const NAV_GROUPS: GrupoNav[] = [
     ],
   },
   {
+    titulo: 'Financeiro',
+    itens: [
+      { href: '/financeiro/despesas', label: 'Despesas', icone: 'despesas' },
+      { href: '/financeiro/receitas', label: 'Receitas', icone: 'receitas' },
+      { href: '/financeiro/clientes', label: 'Clientes', icone: 'clientes' },
+      { href: '/financeiro/contratos', label: 'Contratos', icone: 'contratos' },
+      { href: '/financeiro/centros-custo', label: 'Centros de Custo', icone: 'centros-custo' },
+    ],
+  },
+  {
     titulo: 'Administração',
     itens: [{ href: '/usuarios', label: 'Usuários', icone: 'usuarios', adminOnly: true }],
   },

@@ -35,6 +35,43 @@ enum TipoIntervencao {
   PINTURA
 }
 
+enum StatusContrato {
+  ATIVO
+  ENCERRADO
+  SUSPENSO
+}
+
+enum StatusReceita {
+  RECEBIDO
+  PENDENTE
+  EM_ATRASO
+}
+
+enum CategoriaDespesa {
+  COMBUSTIVEL
+  LUBRIFICANTES
+  OLEO
+  PECAS
+  OFICINA
+  ESTALEIRO
+  MOTOR
+  GERADOR
+  BOMBAS
+  ELETRICA
+  HIDRAULICA
+  ALIMENTACAO
+  HOSPEDAGEM
+  SALARIOS
+  IMPOSTOS
+  SEGURO
+  DOCUMENTACAO
+  MATERIAL_CONSUMO
+  FERRAMENTAS
+  TERCEIROS
+  FRETES
+  OUTROS
+}
+
 model Usuario {
   id        Int            @id @default(autoincrement())
   nome      String         @db.VarChar(100)
@@ -47,6 +84,7 @@ model Usuario {
   notificacoesLidas NotificationRead[]
   auditoriasCriadas Auditoria[]
   logsAlteracao     LogAlteracao[]
+  execucoesRegistradas ExecucaoManutencao[]
 
   @@map("usuario")
 }
@@ -94,6 +132,8 @@ model Embarcacao {
   motores      Motor[]
   cascoPintura ManutencaoCascoPintura[]
   auditorias   Auditoria[]
+  despesas     Despesa[]
+  receitas     Receita[]
 
   @@index([excluidoEm])
   @@map("embarcacao")
@@ -177,10 +217,33 @@ model ManutencaoPreventiva {
   criadoEm             DateTime @default(now()) @map("criado_em") @db.Timestamptz
   atualizadoEm         DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
 
-  motor Motor @relation(fields: [motorId], references: [id], onDelete: Cascade)
+  motor     Motor                @relation(fields: [motorId], references: [id], onDelete: Cascade)
+  execucoes ExecucaoManutencao[]
 
   @@index([motorId])
   @@map("manutencao_preventiva")
+}
+
+/// Historico permanente de execucoes de manutencao.
+/// Cada "Registrar Servico" gera uma linha aqui. NADA e sobrescrito nem apagado.
+model ExecucaoManutencao {
+  id                Int      @id @default(autoincrement())
+  manutencaoId      Int      @map("manutencao_id")
+  horimetro         Decimal  @db.Decimal(10, 2)
+  dataExecucao      DateTime @map("data_execucao") @db.Timestamptz
+  observacoes       String?
+  /// REGISTRO = lancado pelo usuario | MESCLAGEM = recuperado de cadastro duplicado
+  origem            String   @default("REGISTRO") @db.VarChar(20)
+  registradoPorId   Int?     @map("registrado_por_id")
+  registradoPorNome String?  @map("registrado_por_nome") @db.VarChar(150)
+  criadoEm          DateTime @default(now()) @map("criado_em") @db.Timestamptz
+
+  manutencao    ManutencaoPreventiva @relation(fields: [manutencaoId], references: [id], onDelete: Cascade)
+  registradoPor Usuario?             @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
+
+  @@index([manutencaoId])
+  @@index([dataExecucao])
+  @@map("execucao_manutencao")
 }
 
 model ManutencaoCascoPintura {
@@ -248,4 +311,123 @@ model AuditoriaItem {
 
   @@index([auditoriaId])
   @@map("auditoria_item")
+}
+
+// ---------------------------------------------------------------------------
+// Financeiro — Fase 1: nucleo (clientes, contratos, centros de custo,
+// despesas, receitas). Dashboard/KPIs/alertas/relatorios financeiros ficam
+// para fases seguintes, que vao ler estes mesmos dados.
+// ---------------------------------------------------------------------------
+
+/// Exclusao logica: assim como Embarcacao, nunca apaga historico financeiro do banco.
+model Cliente {
+  id               Int       @id @default(autoincrement())
+  nome             String    @db.VarChar(150)
+  documento        String?   @db.VarChar(20)
+  contatoNome      String?   @map("contato_nome") @db.VarChar(150)
+  contatoEmail     String?   @map("contato_email") @db.VarChar(150)
+  contatoTelefone  String?   @map("contato_telefone") @db.VarChar(30)
+  observacoes      String?
+  criadoEm         DateTime  @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm     DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+  excluidoEm       DateTime? @map("excluido_em") @db.Timestamptz
+
+  contratos Contrato[]
+  receitas  Receita[]
+
+  @@index([excluidoEm])
+  @@map("cliente")
+}
+
+model Contrato {
+  id           Int             @id @default(autoincrement())
+  clienteId    Int             @map("cliente_id")
+  numero       String?         @db.VarChar(50)
+  descricao    String?
+  valor        Decimal?        @db.Decimal(12, 2)
+  dataInicio   DateTime?       @map("data_inicio") @db.Date
+  dataFim      DateTime?       @map("data_fim") @db.Date
+  status       StatusContrato  @default(ATIVO)
+  observacoes  String?
+  criadoEm     DateTime        @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime        @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+  excluidoEm   DateTime?       @map("excluido_em") @db.Timestamptz
+
+  cliente  Cliente   @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  receitas Receita[]
+
+  @@index([clienteId])
+  @@index([excluidoEm])
+  @@map("contrato")
+}
+
+/// Taxonomia de centros de custo (ex.: Operacao > Navegacao). Sem exclusao
+/// logica: e uma tabela de apoio, removida so quando nao estiver em uso.
+model CentroCusto {
+  id           Int       @id @default(autoincrement())
+  nome         String    @db.VarChar(100)
+  paiId        Int?      @map("pai_id")
+  criadoEm     DateTime  @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  pai      CentroCusto?  @relation("CentroCustoHierarquia", fields: [paiId], references: [id], onDelete: Restrict)
+  filhos   CentroCusto[] @relation("CentroCustoHierarquia")
+  despesas Despesa[]
+
+  @@index([paiId])
+  @@map("centro_custo")
+}
+
+model Despesa {
+  id               Int              @id @default(autoincrement())
+  categoria        CategoriaDespesa
+  subcategoria     String?          @db.VarChar(100)
+  embarcacaoId     Int?             @map("embarcacao_id")
+  centroCustoId    Int?             @map("centro_custo_id")
+  fornecedor       String?          @db.VarChar(150)
+  numeroNotaFiscal String?          @map("numero_nota_fiscal") @db.VarChar(50)
+  valor            Decimal          @db.Decimal(12, 2)
+  data             DateTime         @db.Date
+  formaPagamento   String?          @map("forma_pagamento") @db.VarChar(50)
+  observacoes      String?
+  criadoEm         DateTime         @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm     DateTime         @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+  excluidoEm       DateTime?        @map("excluido_em") @db.Timestamptz
+
+  embarcacao  Embarcacao?  @relation(fields: [embarcacaoId], references: [id], onDelete: SetNull)
+  centroCusto CentroCusto? @relation(fields: [centroCustoId], references: [id], onDelete: SetNull)
+
+  @@index([embarcacaoId])
+  @@index([centroCustoId])
+  @@index([data])
+  @@index([excluidoEm])
+  @@map("despesa")
+}
+
+model Receita {
+  id               Int           @id @default(autoincrement())
+  clienteId        Int           @map("cliente_id")
+  contratoId       Int?          @map("contrato_id")
+  embarcacaoId     Int?          @map("embarcacao_id")
+  tipoServico      String?       @map("tipo_servico") @db.VarChar(150)
+  valorContratado  Decimal?      @map("valor_contratado") @db.Decimal(12, 2)
+  valorFaturado    Decimal?      @map("valor_faturado") @db.Decimal(12, 2)
+  valorRecebido    Decimal?      @map("valor_recebido") @db.Decimal(12, 2)
+  data             DateTime      @db.Date
+  status           StatusReceita @default(PENDENTE)
+  observacoes      String?
+  criadoEm         DateTime      @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm     DateTime      @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+  excluidoEm       DateTime?     @map("excluido_em") @db.Timestamptz
+
+  cliente    Cliente     @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  contrato   Contrato?   @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  embarcacao Embarcacao? @relation(fields: [embarcacaoId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId])
+  @@index([contratoId])
+  @@index([embarcacaoId])
+  @@index([data])
+  @@index([excluidoEm])
+  @@map("receita")
 }

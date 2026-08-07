@@ -230,3 +230,233 @@ export interface Auditoria {
   embarcacao: Embarcacao;
   criadoPor: { nome: string } | null;
 }
+
+// ---------------------------------------------------------------------------
+// Histórico de execuções e relatório por período
+// ---------------------------------------------------------------------------
+
+export type PeriodoRelatorio = '3m' | '6m' | '12m' | '60m' | 'tudo';
+
+export const PERIODO_RELATORIO_LABEL: Record<PeriodoRelatorio, string> = {
+  '3m': '3 meses',
+  '6m': '6 meses',
+  '12m': 'Anual',
+  '60m': 'Quinquenal',
+  tudo: 'Tudo',
+};
+
+export interface ExecucaoManutencao {
+  id: number;
+  dataExecucao: string;
+  horimetro: number | null;
+  observacoes: string | null;
+  origem: string;
+  registradoPor: string | null;
+}
+
+export interface ManutencaoRelatorio {
+  id: number;
+  tipoServico: string;
+  intervaloHoras: number;
+  alertaLimiteHoras: number;
+  horimetroUltimaTroca: number | null;
+  proximaTroca: number;
+  horasRestantes: number;
+  status: StatusAlerta;
+  execucoes: ExecucaoManutencao[];
+}
+
+export interface MotorRelatorio {
+  id: number;
+  posicao: PosicaoMotor;
+  posicaoLabel: string;
+  marca: string | null;
+  modelo: string | null;
+  potenciaConfig: string | null;
+  numSerie: string | null;
+  horimetroAtual: number;
+  caixaReversora: CaixaReversora | null;
+  sistemaEixoHelice: SistemaEixoHelice | null;
+  correias: Correia[];
+  manutencoes: ManutencaoRelatorio[];
+}
+
+export interface AuditoriaRelatorio {
+  id: number;
+  responsavel: string;
+  dataRealizacao: string;
+  horimetro: number | null;
+  observacoesGerais: string | null;
+  itens: AuditoriaItem[];
+  totalItens: number;
+  itensConcluidos: number;
+}
+
+// ---------------------------------------------------------------------------
+// Financeiro — Fase 1: nucleo (clientes, contratos, centros de custo,
+// despesas, receitas)
+// ---------------------------------------------------------------------------
+
+export type StatusContrato = 'ATIVO' | 'ENCERRADO' | 'SUSPENSO';
+export const STATUS_CONTRATO_LABEL: Record<StatusContrato, string> = {
+  ATIVO: 'Ativo',
+  ENCERRADO: 'Encerrado',
+  SUSPENSO: 'Suspenso',
+};
+export const STATUS_CONTRATO_TONE: Record<StatusContrato, 'good' | 'warn' | 'bad' | 'default'> = {
+  ATIVO: 'good',
+  SUSPENSO: 'warn',
+  ENCERRADO: 'default',
+};
+
+export type StatusReceita = 'RECEBIDO' | 'PENDENTE' | 'EM_ATRASO';
+export const STATUS_RECEITA_LABEL: Record<StatusReceita, string> = {
+  RECEBIDO: 'Recebido',
+  PENDENTE: 'Pendente',
+  EM_ATRASO: 'Em atraso',
+};
+export const STATUS_RECEITA_TONE: Record<StatusReceita, 'good' | 'warn' | 'bad'> = {
+  RECEBIDO: 'good',
+  PENDENTE: 'warn',
+  EM_ATRASO: 'bad',
+};
+
+export type CategoriaDespesa =
+  | 'COMBUSTIVEL'
+  | 'LUBRIFICANTES'
+  | 'OLEO'
+  | 'PECAS'
+  | 'OFICINA'
+  | 'ESTALEIRO'
+  | 'MOTOR'
+  | 'GERADOR'
+  | 'BOMBAS'
+  | 'ELETRICA'
+  | 'HIDRAULICA'
+  | 'ALIMENTACAO'
+  | 'HOSPEDAGEM'
+  | 'SALARIOS'
+  | 'IMPOSTOS'
+  | 'SEGURO'
+  | 'DOCUMENTACAO'
+  | 'MATERIAL_CONSUMO'
+  | 'FERRAMENTAS'
+  | 'TERCEIROS'
+  | 'FRETES'
+  | 'OUTROS';
+
+export const CATEGORIA_DESPESA_LABEL: Record<CategoriaDespesa, string> = {
+  COMBUSTIVEL: 'Combustível',
+  LUBRIFICANTES: 'Lubrificantes',
+  OLEO: 'Óleo',
+  PECAS: 'Peças',
+  OFICINA: 'Oficina',
+  ESTALEIRO: 'Estaleiro',
+  MOTOR: 'Motor',
+  GERADOR: 'Gerador',
+  BOMBAS: 'Bombas',
+  ELETRICA: 'Elétrica',
+  HIDRAULICA: 'Hidráulica',
+  ALIMENTACAO: 'Alimentação',
+  HOSPEDAGEM: 'Hospedagem',
+  SALARIOS: 'Salários',
+  IMPOSTOS: 'Impostos',
+  SEGURO: 'Seguro',
+  DOCUMENTACAO: 'Documentação',
+  MATERIAL_CONSUMO: 'Material de Consumo',
+  FERRAMENTAS: 'Ferramentas',
+  TERCEIROS: 'Terceiros',
+  FRETES: 'Fretes',
+  OUTROS: 'Outros',
+};
+
+export interface Cliente {
+  id: number;
+  nome: string;
+  documento: string | null;
+  contatoNome: string | null;
+  contatoEmail: string | null;
+  contatoTelefone: string | null;
+  observacoes: string | null;
+  criadoEm: string;
+}
+
+export interface Contrato {
+  id: number;
+  clienteId: number;
+  numero: string | null;
+  descricao: string | null;
+  valor: number | null;
+  dataInicio: string | null;
+  dataFim: string | null;
+  status: StatusContrato;
+  observacoes: string | null;
+  criadoEm: string;
+  cliente?: Cliente;
+}
+
+export interface CentroCusto {
+  id: number;
+  nome: string;
+  paiId: number | null;
+}
+
+export interface Despesa {
+  id: number;
+  categoria: CategoriaDespesa;
+  subcategoria: string | null;
+  embarcacaoId: number | null;
+  centroCustoId: number | null;
+  fornecedor: string | null;
+  numeroNotaFiscal: string | null;
+  valor: number;
+  data: string;
+  formaPagamento: string | null;
+  observacoes: string | null;
+  criadoEm: string;
+  embarcacao?: Embarcacao | null;
+  centroCusto?: CentroCusto | null;
+}
+
+export interface Receita {
+  id: number;
+  clienteId: number;
+  contratoId: number | null;
+  embarcacaoId: number | null;
+  tipoServico: string | null;
+  valorContratado: number | null;
+  valorFaturado: number | null;
+  valorRecebido: number | null;
+  data: string;
+  status: StatusReceita;
+  observacoes: string | null;
+  criadoEm: string;
+  cliente?: Cliente;
+  contrato?: Contrato | null;
+  embarcacao?: Embarcacao | null;
+}
+
+export interface RelatorioEmbarcacao {
+  geradoEm: string;
+  periodo: { chave: PeriodoRelatorio; label: string; inicio: string | null; fim: string };
+  embarcacao: {
+    id: number;
+    nome: string;
+    tipoConfiguracao: TipoConfiguracao;
+    latitude: number | null;
+    longitude: number | null;
+    localizacaoAtualizadaEm: string | null;
+  };
+  resumo: {
+    totalMotores: number;
+    totalPlanos: number;
+    manutencoesVencidas: number;
+    manutencoesEmAlerta: number;
+    servicosExecutadosNoPeriodo: number;
+    intervencoesCascoPintura: number;
+    auditoriasRealizadas: number;
+  };
+  motores: MotorRelatorio[];
+  cascoPintura: ManutencaoCascoPintura[];
+  auditorias: AuditoriaRelatorio[];
+}

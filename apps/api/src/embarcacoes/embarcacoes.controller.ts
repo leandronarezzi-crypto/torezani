@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { EmbarcacoesService } from './embarcacoes.service';
+import { RelatorioService, PeriodoRelatorio } from './relatorio.service';
 import { CreateEmbarcacaoDto } from './dto/create-embarcacao.dto';
 import { UpdateEmbarcacaoDto } from './dto/update-embarcacao.dto';
 import { UpdateLocalizacaoDto } from './dto/update-localizacao.dto';
@@ -13,7 +14,10 @@ import { AdminGuard } from '../common/guards/admin.guard';
 @UseGuards(JwtAuthGuard, WriteGuard)
 @Controller('embarcacoes')
 export class EmbarcacoesController {
-  constructor(private readonly embarcacoesService: EmbarcacoesService) {}
+  constructor(
+    private readonly embarcacoesService: EmbarcacoesService,
+    private readonly relatorioService: RelatorioService,
+  ) {}
 
   @Get()
   list() {
@@ -36,6 +40,13 @@ export class EmbarcacoesController {
   @Get(':id/detail')
   getDetail(@Param('id', ParseIntPipe) id: number) {
     return this.embarcacoesService.getDetail(id);
+  }
+
+  /** Relatorio de auditoria da embarcacao, com filtro de periodo. */
+  @Get(':id/relatorio')
+  @ApiQuery({ name: 'periodo', required: false, enum: ['3m', '6m', '12m', '60m', 'tudo'] })
+  relatorio(@Param('id', ParseIntPipe) id: number, @Query('periodo') periodo?: PeriodoRelatorio) {
+    return this.relatorioService.gerar(id, periodo ?? '12m');
   }
 
   @Post()

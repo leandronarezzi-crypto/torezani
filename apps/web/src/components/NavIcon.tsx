@@ -41,6 +41,42 @@ const PATHS: Record<string, ReactNode> = {
       <line x1="21" y1="12" x2="9" y2="12" />
     </>
   ),
+  despesas: (
+    <>
+      <path d="M12 3v14" />
+      <polyline points="6 11 12 17 18 11" />
+      <path d="M4 21h16" />
+    </>
+  ),
+  receitas: (
+    <>
+      <path d="M12 21V7" />
+      <polyline points="6 13 12 7 18 13" />
+      <path d="M4 3h16" />
+    </>
+  ),
+  clientes: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="1" />
+      <path d="M9 21v-4h6v4" />
+      <path d="M9 7h.01M9 11h.01M15 7h.01M15 11h.01" />
+    </>
+  ),
+  contratos: (
+    <>
+      <path d="M8 3h6l4 4v14H8z" />
+      <path d="M14 3v4h4" />
+      <line x1="10" y1="12" x2="16" y2="12" />
+      <line x1="10" y1="16" x2="16" y2="16" />
+    </>
+  ),
+  'centros-custo': (
+    <>
+      <path d="M3 7l9-4 9 4-9 4-9-4Z" />
+      <path d="M3 12l9 4 9-4" />
+      <path d="M3 17l9 4 9-4" />
+    </>
+  ),
 };
 
 export function NavIcon({ name, className = 'h-[18px] w-[18px]' }: { name: string; className?: string }) {

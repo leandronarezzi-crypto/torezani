@@ -12,6 +12,11 @@ import { CascoPinturaModule } from './casco-pintura/casco-pintura.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditoriasModule } from './auditorias/auditorias.module';
 import { HealthModule } from './health/health.module';
+import { ClientesModule } from './clientes/clientes.module';
+import { ContratosModule } from './contratos/contratos.module';
+import { CentrosCustoModule } from './centros-custo/centros-custo.module';
+import { DespesasModule } from './despesas/despesas.module';
+import { ReceitasModule } from './receitas/receitas.module';
 import { AuditoriaLogInterceptor } from './common/interceptors/auditoria-log.interceptor';
 
 @Module({
@@ -28,6 +33,11 @@ import { AuditoriaLogInterceptor } from './common/interceptors/auditoria-log.int
     NotificationsModule,
     AuditoriasModule,
     HealthModule,
+    ClientesModule,
+    ContratosModule,
+    CentrosCustoModule,
+    DespesasModule,
+    ReceitasModule,
   ],
   providers: [
     {
