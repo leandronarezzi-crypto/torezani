@@ -46,8 +46,36 @@ model Usuario {
 
   notificacoesLidas NotificationRead[]
   auditoriasCriadas Auditoria[]
+  logsAlteracao     LogAlteracao[]
 
   @@map("usuario")
+}
+
+/// Trilha de auditoria: registra TODA operacao de escrita feita na API.
+/// Nunca e apagada nem editada — e a prova de quem alterou o que e quando.
+model LogAlteracao {
+  id           Int      @id @default(autoincrement())
+  usuarioId    Int?     @map("usuario_id")
+  usuarioEmail String?  @map("usuario_email") @db.VarChar(150)
+  usuarioPapel String?  @map("usuario_papel") @db.VarChar(20)
+  metodo       String   @db.VarChar(10)
+  rota         String   @db.VarChar(300)
+  entidade     String?  @db.VarChar(60)
+  registroId   String?  @map("registro_id") @db.VarChar(60)
+  dados        Json?
+  statusCode   Int      @map("status_code")
+  sucesso      Boolean  @default(true)
+  erro         String?
+  ip           String?  @db.VarChar(60)
+  duracaoMs    Int?     @map("duracao_ms")
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId])
+  @@index([criadoEm])
+  @@index([entidade, registroId])
+  @@map("log_alteracao")
 }
 
 model Embarcacao {
@@ -59,11 +87,15 @@ model Embarcacao {
   localizacaoAtualizadaEm DateTime? @map("localizacao_atualizada_em") @db.Timestamptz
   criadoEm                DateTime  @default(now()) @map("criado_em") @db.Timestamptz
   atualizadoEm            DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+  /// Exclusao logica: quando preenchido, a embarcacao some das telas mas
+  /// NADA e apagado do banco (motores, manutencoes e historico continuam intactos).
+  excluidoEm              DateTime? @map("excluido_em") @db.Timestamptz
 
   motores      Motor[]
   cascoPintura ManutencaoCascoPintura[]
   auditorias   Auditoria[]
 
+  @@index([excluidoEm])
   @@map("embarcacao")
 }
 

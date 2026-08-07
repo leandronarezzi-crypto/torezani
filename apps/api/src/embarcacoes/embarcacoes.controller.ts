@@ -6,6 +6,7 @@ import { UpdateEmbarcacaoDto } from './dto/update-embarcacao.dto';
 import { UpdateLocalizacaoDto } from './dto/update-localizacao.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { WriteGuard } from '../common/guards/write.guard';
+import { AdminGuard } from '../common/guards/admin.guard';
 
 @ApiTags('embarcacoes')
 @ApiBearerAuth()
@@ -17,6 +18,14 @@ export class EmbarcacoesController {
   @Get()
   list() {
     return this.embarcacoesService.list();
+  }
+
+  // ATENCAO: esta rota precisa vir ANTES de @Get(':id'),
+  // senao "lixeira" seria interpretado como um id.
+  @Get('lixeira')
+  @UseGuards(AdminGuard)
+  listExcluidas() {
+    return this.embarcacoesService.listExcluidas();
   }
 
   @Get(':id')
@@ -43,6 +52,12 @@ export class EmbarcacoesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id', ParseIntPipe) id: number) {
     await this.embarcacoesService.remove(id);
+  }
+
+  @Post(':id/restaurar')
+  @UseGuards(AdminGuard)
+  restaurar(@Param('id', ParseIntPipe) id: number) {
+    return this.embarcacoesService.restaurar(id);
   }
 
   @Patch(':id/localizacao')

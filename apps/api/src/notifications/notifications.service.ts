@@ -44,7 +44,9 @@ export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAlertas(): Promise<{ resumo: Record<string, number>; manutencoes: ManutencaoAlerta[]; cascoPintura: CascoPinturaAlerta[] }> {
+    // Embarcacoes excluidas (exclusao logica) nao geram alerta nem notificacao.
     const manutencaoRows = await this.prisma.manutencaoPreventiva.findMany({
+      where: { motor: { embarcacao: { excluidoEm: null } } },
       include: { motor: { include: { embarcacao: true } } },
     });
 
@@ -73,7 +75,7 @@ export class NotificationsService {
       .sort((a, b) => a.horasRestantes - b.horasRestantes);
 
     const cascoPinturaRows = await this.prisma.manutencaoCascoPintura.findMany({
-      where: { alertaVencimentoData: { not: null } },
+      where: { alertaVencimentoData: { not: null }, embarcacao: { excluidoEm: null } },
       include: { embarcacao: true },
     });
 

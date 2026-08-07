@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MotoresService } from '../motores/motores.service';
 import { CascoPinturaService } from '../casco-pintura/casco-pintura.service';
@@ -6,6 +6,9 @@ import { CreateEmbarcacaoDto } from './dto/create-embarcacao.dto';
 import { UpdateEmbarcacaoDto } from './dto/update-embarcacao.dto';
 import { UpdateLocalizacaoDto } from './dto/update-localizacao.dto';
 import { toNumber } from '../common/decimal';
+
+/** Filtro padrao: so embarcacoes ativas (nao excluidas). */
+const SOMENTE_ATIVAS = { excluidoEm: null } as const;
 
 function serialize(embarcacao: { latitude: unknown; longitude: unknown; [key: string]: unknown }) {
   return { ...embarcacao, latitude: toNumber(embarcacao.latitude as any), longitude: toNumber(embarcacao.longitude as any) };
@@ -20,12 +23,15 @@ export class EmbarcacoesService {
   ) {}
 
   async list() {
-    const embarcacoes = await this.prisma.embarcacao.findMany({ orderBy: { nome: 'asc' } });
+    const embarcacoes = await this.prisma.embarcacao.findMany({
+      where: SOMENTE_ATIVAS,
+      orderBy: { nome: 'asc' },
+    });
     return embarcacoes.map(serialize);
   }
 
   async get(id: number) {
-    const embarcacao = await this.prisma.embarcacao.findUnique({ where: { id } });
+    const embarcacao = await this.prisma.embarcacao.findFirst({ where: { id, ...SOMENTE_ATIVAS } });
     if (!embarcacao) throw new NotFoundException('Embarcação não encontrada');
     return serialize(embarcacao);
   }
@@ -53,21 +59,48 @@ export class EmbarcacoesService {
   }
 
   async update(id: number, dto: UpdateEmbarcacaoDto) {
-    const exists = await this.prisma.embarcacao.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException('Embarcação não encontrada');
+    await this.get(id);
     const embarcacao = await this.prisma.embarcacao.update({ where: { id }, data: { nome: dto.nome.trim() } });
     return serialize(embarcacao);
   }
 
+  /**
+   * EXCLUSAO LOGICA. Nao apaga nada do banco: apenas marca a embarcacao como
+   * excluida. Motores, correias, manutencoes, casco/pintura e auditorias
+   * permanecem intactos e podem ser recuperados a qualquer momento.
+   */
   async remove(id: number) {
-    const exists = await this.prisma.embarcacao.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException('Embarcação não encontrada');
-    await this.prisma.embarcacao.delete({ where: { id } });
+    await this.get(id);
+    await this.prisma.embarcacao.update({
+      where: { id },
+      data: { excluidoEm: new Date() },
+    });
+  }
+
+  /** Lista as embarcacoes excluidas (lixeira). Somente ADMIN. */
+  async listExcluidas() {
+    const embarcacoes = await this.prisma.embarcacao.findMany({
+      where: { excluidoEm: { not: null } },
+      orderBy: { excluidoEm: 'desc' },
+    });
+    return embarcacoes.map(serialize);
+  }
+
+  /** Restaura uma embarcacao excluida, com todo o historico. Somente ADMIN. */
+  async restaurar(id: number) {
+    const embarcacao = await this.prisma.embarcacao.findUnique({ where: { id } });
+    if (!embarcacao) throw new NotFoundException('Embarcação não encontrada');
+    if (!embarcacao.excluidoEm) throw new ConflictException('Esta embarcação não está excluída');
+
+    const restaurada = await this.prisma.embarcacao.update({
+      where: { id },
+      data: { excluidoEm: null },
+    });
+    return serialize(restaurada);
   }
 
   async updateLocalizacao(id: number, dto: UpdateLocalizacaoDto) {
-    const exists = await this.prisma.embarcacao.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException('Embarcação não encontrada');
+    await this.get(id);
 
     const embarcacao = await this.prisma.embarcacao.update({
       where: { id },

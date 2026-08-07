@@ -7,3 +7,7 @@ dist/
 next-env.d.ts
 server.log
 *.tsbuildinfo
+
+# Backups do banco: contem dados reais do cliente. NUNCA enviar para o GitHub.
+backups/
+apps/api/backups/

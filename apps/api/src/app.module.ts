@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
@@ -11,6 +12,7 @@ import { CascoPinturaModule } from './casco-pintura/casco-pintura.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditoriasModule } from './auditorias/auditorias.module';
 import { HealthModule } from './health/health.module';
+import { AuditoriaLogInterceptor } from './common/interceptors/auditoria-log.interceptor';
 
 @Module({
   imports: [
@@ -26,6 +28,12 @@ import { HealthModule } from './health/health.module';
     NotificationsModule,
     AuditoriasModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditoriaLogInterceptor,
+    },
   ],
 })
 export class AppModule {}
