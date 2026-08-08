@@ -657,13 +657,13 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
         <table className="w-full text-left text-sm">
           <thead className="text-xs uppercase text-foreground-soft">
             <tr>
-              <th className="py-1">Serviço</th>
-              <th className="py-1">Tipo</th>
-              <th className="py-1">Última</th>
-              <th className="py-1">Intervalo</th>
-              <th className="py-1">Próxima</th>
-              <th className="py-1">Restam</th>
-              <th className="py-1">Status</th>
+              <th className="py-1 pr-4">Serviço</th>
+              <th className="py-1 pr-4">Tipo</th>
+              <th className="py-1 pr-4 whitespace-nowrap">Última</th>
+              <th className="py-1 pr-4 whitespace-nowrap">Intervalo</th>
+              <th className="py-1 pr-4 whitespace-nowrap">Próxima</th>
+              <th className="py-1 pr-4 whitespace-nowrap">Restam</th>
+              <th className="py-1 pr-4">Status</th>
               <th />
             </tr>
           </thead>
@@ -677,15 +677,15 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
             ) : (
               motor.manutencoes.map((m) => (
                 <tr key={m.id} className="border-t border-line">
-                  <td className="py-2">{m.tipoServico}</td>
-                  <td className="py-2">
+                  <td className="py-2 pr-4">{m.tipoServico}</td>
+                  <td className="py-2 pr-4 whitespace-nowrap">
                     <Badge tone={TIPO_MANUTENCAO_TONE[m.tipo]}>{TIPO_MANUTENCAO_LABEL[m.tipo]}</Badge>
                   </td>
-                  <td className="py-2">{formatNumber(m.horimetroUltimaTroca)} h</td>
-                  <td className="py-2">{m.intervaloHoras != null ? `${m.intervaloHoras} h` : '—'}</td>
-                  <td className="py-2">{m.proximaTroca != null ? `${formatNumber(m.proximaTroca)} h` : '—'}</td>
-                  <td className="py-2">{m.horasRestantes != null ? `${formatNumber(m.horasRestantes)} h` : '—'}</td>
-                  <td className="py-2">
+                  <td className="py-2 pr-4 whitespace-nowrap">{formatNumber(m.horimetroUltimaTroca)} h</td>
+                  <td className="py-2 pr-4 whitespace-nowrap">{m.intervaloHoras != null ? `${m.intervaloHoras} h` : '—'}</td>
+                  <td className="py-2 pr-4 whitespace-nowrap">{m.proximaTroca != null ? `${formatNumber(m.proximaTroca)} h` : '—'}</td>
+                  <td className="py-2 pr-4 whitespace-nowrap">{m.horasRestantes != null ? `${formatNumber(m.horasRestantes)} h` : '—'}</td>
+                  <td className="py-2 pr-4 whitespace-nowrap">
                     <StatusDot status={m.status} />
                   </td>
                   <td className="space-x-2 whitespace-nowrap py-2 text-right">
