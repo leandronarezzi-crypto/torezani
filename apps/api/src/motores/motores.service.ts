@@ -19,8 +19,8 @@ function serializeManutencao(
 ) {
   const base = { ...m, horimetroUltimaTroca: toNumber(m.horimetroUltimaTroca as any) };
 
-  // Preditiva/Corretiva sao eventos pontuais: nao ha "proxima troca" a calcular.
-  if (m.tipo !== 'PREVENTIVA' || m.intervaloHoras == null) {
+  // Corretiva e evento pontual: nao ha "proxima troca/inspecao" a calcular.
+  if (m.tipo === 'CORRETIVA' || m.intervaloHoras == null) {
     return { ...base, proximaTroca: null, horasRestantes: null, status: 'N/A' as const };
   }
 

@@ -91,6 +91,7 @@ model Usuario {
   auditoriasCriadas Auditoria[]
   logsAlteracao     LogAlteracao[]
   execucoesRegistradas ExecucaoManutencao[]
+  ordensServicoEmitidas OrdemServico[]
 
   @@map("usuario")
 }
@@ -135,11 +136,12 @@ model Embarcacao {
   /// NADA e apagado do banco (motores, manutencoes e historico continuam intactos).
   excluidoEm              DateTime? @map("excluido_em") @db.Timestamptz
 
-  motores      Motor[]
-  cascoPintura ManutencaoCascoPintura[]
-  auditorias   Auditoria[]
-  despesas     Despesa[]
-  receitas     Receita[]
+  motores       Motor[]
+  cascoPintura  ManutencaoCascoPintura[]
+  auditorias    Auditoria[]
+  despesas      Despesa[]
+  receitas      Receita[]
+  ordensServico OrdemServico[]
 
   @@index([excluidoEm])
   @@map("embarcacao")
@@ -162,6 +164,7 @@ model Motor {
   sistemaEixoHelice SistemaEixoHelice?
   correias          Correia[]
   manutencoes       ManutencaoPreventiva[]
+  ordensServico     OrdemServico[]
 
   @@index([embarcacaoId])
   @@map("motor")
@@ -219,14 +222,16 @@ model ManutencaoPreventiva {
   tipo                 TipoManutencao  @default(PREVENTIVA)
   tipoServico          String          @map("tipo_servico") @db.VarChar(255)
   horimetroUltimaTroca Decimal         @default(0.00) @map("horimetro_ultima_troca") @db.Decimal(10, 2)
-  /// So obrigatorio para tipo PREVENTIVA. Preditiva/Corretiva sao eventos pontuais, sem "proxima troca".
+  /// Obrigatorio para Preventiva (proxima troca) e Preditiva (proxima inspecao).
+  /// Corretiva e evento pontual (reparo ja feito), sempre null.
   intervaloHoras       Int?            @map("intervalo_horas")
   alertaLimiteHoras    Int             @default(0) @map("alerta_limite_horas")
   criadoEm             DateTime        @default(now()) @map("criado_em") @db.Timestamptz
   atualizadoEm         DateTime        @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
 
-  motor     Motor                @relation(fields: [motorId], references: [id], onDelete: Cascade)
-  execucoes ExecucaoManutencao[]
+  motor         Motor                @relation(fields: [motorId], references: [id], onDelete: Cascade)
+  execucoes     ExecucaoManutencao[]
+  ordensServico OrdemServico[]
 
   @@index([motorId])
   @@map("manutencao_preventiva")
@@ -445,4 +450,35 @@ model Receita {
   @@index([data])
   @@index([excluidoEm])
   @@map("receita")
+}
+
+/// Documento formal impresso ("formulario") pra encaminhar um servico de manutencao
+/// (vencido ou nao) a quem for executa-lo. E um registro permanente — nunca editado
+/// nem apagado — que fixa o numero (o proprio id) e o estado da manutencao no
+/// momento da emissao, para servir de comprovante e evitar emissao duplicada.
+model OrdemServico {
+  id             Int            @id @default(autoincrement())
+  manutencaoId   Int?           @map("manutencao_id")
+  embarcacaoId   Int            @map("embarcacao_id")
+  motorId        Int?           @map("motor_id")
+  tipo           TipoManutencao
+  tipoServico    String         @map("tipo_servico") @db.VarChar(255)
+  horimetroAtual Decimal?       @map("horimetro_atual") @db.Decimal(10, 2)
+  horasRestantes Int?           @map("horas_restantes")
+  /// Snapshot do status (VENCIDO/ALERTA/OK/N-A) no momento da emissao.
+  status         String         @db.VarChar(20)
+  observacoes    String?
+  emitidoPorId   Int?           @map("emitido_por_id")
+  emitidoPorNome String?        @map("emitido_por_nome") @db.VarChar(150)
+  criadoEm       DateTime       @default(now()) @map("criado_em") @db.Timestamptz
+
+  manutencao ManutencaoPreventiva? @relation(fields: [manutencaoId], references: [id], onDelete: SetNull)
+  embarcacao Embarcacao            @relation(fields: [embarcacaoId], references: [id], onDelete: Cascade)
+  motor      Motor?                @relation(fields: [motorId], references: [id], onDelete: SetNull)
+  emitidoPor Usuario?              @relation(fields: [emitidoPorId], references: [id], onDelete: SetNull)
+
+  @@index([embarcacaoId])
+  @@index([manutencaoId])
+  @@index([criadoEm])
+  @@map("ordem_servico")
 }

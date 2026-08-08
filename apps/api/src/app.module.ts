@@ -17,6 +17,7 @@ import { ContratosModule } from './contratos/contratos.module';
 import { CentrosCustoModule } from './centros-custo/centros-custo.module';
 import { DespesasModule } from './despesas/despesas.module';
 import { ReceitasModule } from './receitas/receitas.module';
+import { OrdensServicoModule } from './ordens-servico/ordens-servico.module';
 import { AuditoriaLogInterceptor } from './common/interceptors/auditoria-log.interceptor';
 
 @Module({
@@ -38,6 +39,7 @@ import { AuditoriaLogInterceptor } from './common/interceptors/auditoria-log.int
     CentrosCustoModule,
     DespesasModule,
     ReceitasModule,
+    OrdensServicoModule,
   ],
   providers: [
     {

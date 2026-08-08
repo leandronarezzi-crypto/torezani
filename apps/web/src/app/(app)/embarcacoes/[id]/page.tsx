@@ -19,6 +19,7 @@ import {
   type ManutencaoCascoPintura,
   type ManutencaoPreventiva,
   type MotorDetalhado,
+  type OrdemServico,
   type TipoManutencao,
 } from '@/lib/types';
 
@@ -549,6 +550,7 @@ function BeltsCard({ motor, refetch }: { motor: MotorDetalhado; refetch: () => v
 type EstadoModalManutencao = { modo: 'novo' } | { modo: 'editar'; manutencao: ManutencaoPreventiva } | null;
 
 function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: () => void }) {
+  const router = useRouter();
   const [modal, setModal] = useState<EstadoModalManutencao>(null);
   const [tipoForm, setTipoForm] = useState<TipoManutencao>('PREVENTIVA');
   const [salvando, setSalvando] = useState(false);
@@ -557,6 +559,7 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
   const [modalRegistro, setModalRegistro] = useState<ManutencaoPreventiva | null>(null);
   const [salvandoRegistro, setSalvandoRegistro] = useState(false);
   const [erroRegistro, setErroRegistro] = useState<string | null>(null);
+  const [gerandoOsId, setGerandoOsId] = useState<number | null>(null);
 
   useEffect(() => {
     setTipoForm(modal?.modo === 'editar' ? modal.manutencao.tipo : 'PREVENTIVA');
@@ -605,6 +608,17 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
     refetch();
   }
 
+  async function gerarOs(m: ManutencaoPreventiva) {
+    setGerandoOsId(m.id);
+    try {
+      const os = await api.post<OrdemServico>('/ordens-servico', { manutencaoId: m.id });
+      router.push(`/ordens-servico/${os.id}`);
+    } catch (err) {
+      window.alert(err instanceof ApiError ? err.message : 'Não foi possível gerar a ordem de serviço.');
+      setGerandoOsId(null);
+    }
+  }
+
   async function salvarRegistro(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!modalRegistro) return;
@@ -645,9 +659,9 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
             <tr>
               <th className="py-1">Serviço</th>
               <th className="py-1">Tipo</th>
-              <th className="py-1">Última Troca</th>
+              <th className="py-1">Última</th>
               <th className="py-1">Intervalo</th>
-              <th className="py-1">Próxima Troca</th>
+              <th className="py-1">Próxima</th>
               <th className="py-1">Restam</th>
               <th className="py-1">Status</th>
               <th />
@@ -678,6 +692,15 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
                     <button onClick={() => setModalRegistro(m)} className="write-only text-xs font-semibold text-success hover:underline">
                       Registrar Serviço
                     </button>
+                    {m.tipo !== 'CORRETIVA' ? (
+                      <button
+                        onClick={() => gerarOs(m)}
+                        disabled={gerandoOsId === m.id}
+                        className="write-only text-xs font-semibold text-accent hover:underline disabled:opacity-50"
+                      >
+                        {gerandoOsId === m.id ? 'Gerando…' : 'Gerar OS'}
+                      </button>
+                    ) : null}
                     <button onClick={() => setModal({ modo: 'editar', manutencao: m })} className="write-only text-xs text-foreground-soft hover:text-accent">
                       Editar
                     </button>
@@ -721,7 +744,9 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
             </select>
           </div>
           <div>
-            <label className={LABEL_CLASSE}>{tipoForm === 'PREVENTIVA' ? 'Horímetro da Última Troca' : 'Horímetro no Momento'}</label>
+            <label className={LABEL_CLASSE}>
+              {tipoForm === 'PREVENTIVA' ? 'Horímetro da Última Troca' : tipoForm === 'PREDITIVA' ? 'Horímetro da Última Inspeção' : 'Horímetro no Momento'}
+            </label>
             <input
               type="number"
               step="0.01"
@@ -732,10 +757,10 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
             />
           </div>
 
-          {tipoForm === 'PREVENTIVA' ? (
-            <Fragment key="preventiva">
+          {tipoForm !== 'CORRETIVA' ? (
+            <Fragment key="agendada">
               <div>
-                <label className={LABEL_CLASSE}>Intervalo (horas)</label>
+                <label className={LABEL_CLASSE}>{tipoForm === 'PREDITIVA' ? 'Intervalo entre inspeções (horas)' : 'Intervalo (horas)'}</label>
                 <input
                   type="number"
                   min={1}

@@ -478,3 +478,66 @@ export interface RelatorioEmbarcacao {
   cascoPintura: ManutencaoCascoPintura[];
   auditorias: AuditoriaRelatorio[];
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard de Manutenção da frota (Preventiva / Preditiva / Corretiva)
+// ---------------------------------------------------------------------------
+
+export interface ManutencaoVencida {
+  embarcacaoId: number;
+  embarcacaoNome: string;
+  motorPosicao: PosicaoMotor;
+  manutencaoId: number;
+  tipo: TipoManutencao;
+  tipoServico: string;
+  horasRestantes: number | null;
+}
+
+export interface ManutencaoDashboardItem {
+  id: number;
+  tipo: TipoManutencao;
+  tipoServico: string;
+  embarcacaoId: number;
+  embarcacaoNome: string;
+  motorPosicao: PosicaoMotor;
+  status: StatusAlerta;
+  horasRestantes: number | null;
+  execucoes: ExecucaoManutencao[];
+}
+
+export interface ManutencoesDashboard {
+  geradoEm: string;
+  periodo: { chave: PeriodoRelatorio; label: string; inicio: string | null; fim: string };
+  resumo: {
+    totalEmbarcacoes: number;
+    totalPlanos: number;
+    porTipo: Record<TipoManutencao, { servicos: number; custo: number }>;
+    custoTotalPeriodo: number;
+    manutencoesVencidas: number;
+    manutencoesEmAlerta: number;
+  };
+  vencidos: ManutencaoVencida[];
+  itens: ManutencaoDashboardItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Ordem de Serviço
+// ---------------------------------------------------------------------------
+
+export interface OrdemServico {
+  id: number;
+  manutencaoId: number | null;
+  embarcacaoId: number;
+  motorId: number | null;
+  tipo: TipoManutencao;
+  tipoServico: string;
+  horimetroAtual: number | null;
+  horasRestantes: number | null;
+  status: StatusAlerta;
+  observacoes: string | null;
+  emitidoPorNome: string | null;
+  criadoEm: string;
+  embarcacao?: Embarcacao;
+  motor?: Motor | null;
+  manutencao?: ManutencaoPreventiva | null;
+}

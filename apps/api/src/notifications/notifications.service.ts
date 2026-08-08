@@ -46,8 +46,9 @@ export class NotificationsService {
   async getAlertas(): Promise<{ resumo: Record<string, number>; manutencoes: ManutencaoAlerta[]; cascoPintura: CascoPinturaAlerta[] }> {
     // Embarcacoes excluidas (exclusao logica) nao geram alerta nem notificacao.
     const manutencaoRows = await this.prisma.manutencaoPreventiva.findMany({
-      // Preditiva/Corretiva sao eventos pontuais ja resolvidos: nao entram no calculo de vencimento.
-      where: { tipo: 'PREVENTIVA', motor: { embarcacao: { excluidoEm: null } } },
+      // Corretiva e evento pontual ja resolvido: nao entra no calculo de vencimento.
+      // Preventiva e Preditiva sao recorrentes (troca/inspecao) e podem vencer.
+      where: { tipo: { not: 'CORRETIVA' }, motor: { embarcacao: { excluidoEm: null } } },
       include: { motor: { include: { embarcacao: true } } },
     });
 

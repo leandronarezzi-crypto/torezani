@@ -35,6 +35,8 @@ const NAV_GROUPS: GrupoNav[] = [
     itens: [
       { href: '/embarcacoes', label: 'Embarcações', icone: 'embarcacoes' },
       { href: '/mapa', label: 'Mapa', icone: 'mapa' },
+      { href: '/manutencoes', label: 'Manutenção', icone: 'manutencao' },
+      { href: '/ordens-servico', label: 'Ordens de Serviço', icone: 'ordem-servico' },
     ],
   },
   {

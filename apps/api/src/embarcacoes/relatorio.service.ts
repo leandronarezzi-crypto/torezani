@@ -64,9 +64,9 @@ export class RelatorioService {
       const horimetroAtual = toNumber(motor.horimetroAtual) ?? 0;
 
       const manutencoes = motor.manutencoes.map((m) => {
-        // Preditiva/Corretiva sao eventos pontuais: nao ha "proxima troca" a calcular.
+        // Corretiva e evento pontual: nao ha "proxima troca/inspecao" a calcular.
         const calc =
-          m.tipo === 'PREVENTIVA' && m.intervaloHoras != null
+          m.tipo !== 'CORRETIVA' && m.intervaloHoras != null
             ? computeManutencaoStatus(horimetroAtual, Number(m.horimetroUltimaTroca), m.intervaloHoras, m.alertaLimiteHoras)
             : { proximaTroca: null as number | null, horasRestantes: null as number | null, status: 'N/A' as const };
         if (calc.status === 'VENCIDO') totalVencidas++;

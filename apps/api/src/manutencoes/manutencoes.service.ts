@@ -5,6 +5,7 @@ import { UpsertManutencaoDto } from './dto/upsert-manutencao.dto';
 import { RegistrarServicoDto } from './dto/registrar-servico.dto';
 import { toNumber } from '../common/decimal';
 import { computeManutencaoStatus } from '../common/alert-calculators';
+import { PERIODOS, type PeriodoRelatorio } from '../embarcacoes/relatorio.service';
 import type { AuthUser } from '../common/types/auth-user';
 
 const TIPO_MANUTENCAO_LABEL: Record<TipoManutencao, string> = {
@@ -39,8 +40,9 @@ function annotate(
 ) {
   const base = { ...m, horimetroUltimaTroca: toNumber(m.horimetroUltimaTroca as any) };
 
-  // Preditiva/Corretiva sao eventos pontuais: nao ha "proxima troca" a acompanhar.
-  if (m.tipo !== 'PREVENTIVA' || m.intervaloHoras == null) {
+  // Corretiva e evento pontual (reparo ja feito): nao ha "proxima troca/inspecao" a acompanhar.
+  // Preventiva e Preditiva sao recorrentes por intervalo de horas (troca vs. inspecao).
+  if (m.tipo === 'CORRETIVA' || m.intervaloHoras == null) {
     return { ...base, proximaTroca: null, horasRestantes: null, status: 'N/A' as const };
   }
 
@@ -85,13 +87,15 @@ export class ManutencoesService implements OnModuleInit {
   /**
    * Cria uma manutencao no motor.
    *
-   * PREVENTIVA: cria (ou reaproveita) um plano recorrente com intervalo de horas.
-   * Se ja existir o MESMO servico do MESMO tipo no MESMO motor, nao cria duplicata:
-   * registra a troca informada no plano existente.
+   * PREVENTIVA/PREDITIVA: cria (ou reaproveita) um plano recorrente com intervalo de
+   * horas — a diferenca entre as duas e so de rotulo (troca vs. inspecao), os dois
+   * tem "proxima troca/inspecao" acompanhada pelo horimetro. Se ja existir o MESMO
+   * servico do MESMO tipo no MESMO motor, nao cria duplicata: registra a troca
+   * informada no plano existente.
    *
-   * PREDITIVA/CORRETIVA: sao eventos pontuais (o cadastro ja E o registro da
-   * ocorrencia) — sempre gera uma linha de historico, e uma Despesa automatica
-   * se um custo for informado.
+   * CORRETIVA: e um evento pontual (o cadastro ja E o registro do reparo feito) —
+   * sempre gera uma linha de historico, e uma Despesa automatica se um custo for
+   * informado.
    */
   async create(motorId: number, dto: UpsertManutencaoDto, usuario?: AuthUser) {
     const motor = await this.prisma.motor.findUnique({ where: { id: motorId } });
@@ -104,7 +108,7 @@ export class ManutencoesService implements OnModuleInit {
     const existentes = await this.prisma.manutencaoPreventiva.findMany({ where: { motorId } });
     const jaExiste = existentes.find((m) => chaveServico(m.tipoServico) === chave && m.tipo === tipo);
 
-    if (tipo !== 'PREVENTIVA') {
+    if (tipo === 'CORRETIVA') {
       const horimetroEvento = dto.horimetroUltimaTroca ?? horimetroMotor;
       const manutencaoId = jaExiste
         ? jaExiste.id
@@ -146,13 +150,13 @@ export class ManutencoesService implements OnModuleInit {
     }
 
     if (dto.intervaloHoras == null) {
-      throw new BadRequestException('intervaloHoras é obrigatório para manutenção Preventiva');
+      throw new BadRequestException('intervaloHoras é obrigatório para manutenção Preventiva/Preditiva');
     }
 
     const manutencao = await this.prisma.manutencaoPreventiva.create({
       data: {
         motorId,
-        tipo: 'PREVENTIVA',
+        tipo,
         tipoServico: dto.tipoServico.trim(),
         horimetroUltimaTroca: dto.horimetroUltimaTroca ?? 0,
         intervaloHoras: dto.intervaloHoras,
@@ -184,8 +188,8 @@ export class ManutencoesService implements OnModuleInit {
     if (!existing) throw new NotFoundException('Manutenção não encontrada');
 
     const tipo = dto.tipo ?? existing.tipo;
-    if (tipo === 'PREVENTIVA' && dto.intervaloHoras == null && existing.intervaloHoras == null) {
-      throw new BadRequestException('intervaloHoras é obrigatório para manutenção Preventiva');
+    if (tipo !== 'CORRETIVA' && dto.intervaloHoras == null && existing.intervaloHoras == null) {
+      throw new BadRequestException('intervaloHoras é obrigatório para manutenção Preventiva/Preditiva');
     }
 
     const manutencao = await this.prisma.manutencaoPreventiva.update({
@@ -194,7 +198,7 @@ export class ManutencoesService implements OnModuleInit {
         tipo,
         tipoServico: dto.tipoServico.trim(),
         horimetroUltimaTroca: dto.horimetroUltimaTroca ?? 0,
-        intervaloHoras: tipo === 'PREVENTIVA' ? (dto.intervaloHoras ?? existing.intervaloHoras) : null,
+        intervaloHoras: tipo !== 'CORRETIVA' ? (dto.intervaloHoras ?? existing.intervaloHoras) : null,
         alertaLimiteHoras: dto.alertaLimiteHoras ?? 0,
       },
     });
@@ -271,6 +275,117 @@ export class ManutencoesService implements OnModuleInit {
       orderBy: [{ dataExecucao: 'desc' }, { id: 'desc' }],
     });
     return execucoes.map((e) => ({ ...e, horimetro: toNumber(e.horimetro), custo: toNumber(e.custo) }));
+  }
+
+  // ------------------------------------------------------------------
+  // Dashboard da frota (Preventiva / Preditiva / Corretiva)
+  // ------------------------------------------------------------------
+
+  /**
+   * Visao consolidada de manutencao de TODA a frota, para o dashboard e o
+   * relatorio imprimivel. "vencidos" e sempre o estado ATUAL (independente do
+   * periodo escolhido) — um item vencido nao pode sumir do relatorio so
+   * porque a ultima execucao dele foi ha mais tempo que o periodo selecionado.
+   * "itens" (o que foi feito) ja vem filtrado pelas execucoes do periodo.
+   */
+  async dashboardFrota(periodo: PeriodoRelatorio = '12m') {
+    const config = PERIODOS[periodo];
+    if (!config) {
+      throw new BadRequestException(`Período inválido. Use: ${Object.keys(PERIODOS).join(', ')}`);
+    }
+
+    const fim = new Date();
+    const inicio = config.meses ? new Date(new Date().setMonth(fim.getMonth() - config.meses)) : new Date(0);
+    const noPeriodo = { gte: inicio, lte: fim };
+
+    const manutencoes = await this.prisma.manutencaoPreventiva.findMany({
+      where: { motor: { embarcacao: { excluidoEm: null } } },
+      include: {
+        motor: { include: { embarcacao: true } },
+        execucoes: { where: { dataExecucao: noPeriodo }, orderBy: [{ dataExecucao: 'desc' }, { id: 'desc' }] },
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    const porTipo: Record<TipoManutencao, { servicos: number; custo: number }> = {
+      PREVENTIVA: { servicos: 0, custo: 0 },
+      PREDITIVA: { servicos: 0, custo: 0 },
+      CORRETIVA: { servicos: 0, custo: 0 },
+    };
+    const vencidos: Array<{
+      embarcacaoId: number;
+      embarcacaoNome: string;
+      motorPosicao: string;
+      manutencaoId: number;
+      tipo: TipoManutencao;
+      tipoServico: string;
+      horasRestantes: number | null;
+    }> = [];
+    let manutencoesEmAlerta = 0;
+
+    const todosItens = manutencoes.map((m) => {
+      const horimetroAtual = toNumber(m.motor.horimetroAtual) ?? 0;
+      const statusInfo =
+        m.tipo !== 'CORRETIVA' && m.intervaloHoras != null
+          ? computeManutencaoStatus(horimetroAtual, Number(m.horimetroUltimaTroca), m.intervaloHoras, m.alertaLimiteHoras)
+          : { proximaTroca: null as number | null, horasRestantes: null as number | null, status: 'N/A' as const };
+
+      for (const e of m.execucoes) {
+        porTipo[m.tipo].servicos += 1;
+        porTipo[m.tipo].custo += toNumber(e.custo) ?? 0;
+      }
+
+      if (statusInfo.status === 'VENCIDO') {
+        vencidos.push({
+          embarcacaoId: m.motor.embarcacaoId,
+          embarcacaoNome: m.motor.embarcacao.nome,
+          motorPosicao: m.motor.posicao,
+          manutencaoId: m.id,
+          tipo: m.tipo,
+          tipoServico: m.tipoServico,
+          horasRestantes: statusInfo.horasRestantes,
+        });
+      }
+      if (statusInfo.status === 'ALERTA') manutencoesEmAlerta++;
+
+      return {
+        id: m.id,
+        tipo: m.tipo,
+        tipoServico: m.tipoServico,
+        embarcacaoId: m.motor.embarcacaoId,
+        embarcacaoNome: m.motor.embarcacao.nome,
+        motorPosicao: m.motor.posicao,
+        status: statusInfo.status,
+        horasRestantes: statusInfo.horasRestantes,
+        execucoes: m.execucoes.map((e) => ({
+          id: e.id,
+          dataExecucao: e.dataExecucao,
+          horimetro: toNumber(e.horimetro),
+          observacoes: e.observacoes,
+          custo: toNumber(e.custo),
+          fornecedor: e.fornecedor,
+          registradoPor: e.registradoPorNome,
+        })),
+      };
+    });
+
+    vencidos.sort((a, b) => (a.horasRestantes ?? 0) - (b.horasRestantes ?? 0));
+    const itens = todosItens.filter((item) => item.execucoes.length > 0);
+
+    return {
+      geradoEm: new Date(),
+      periodo: { chave: periodo, label: config.label, inicio: config.meses ? inicio : null, fim },
+      resumo: {
+        totalEmbarcacoes: new Set(manutencoes.map((m) => m.motor.embarcacaoId)).size,
+        totalPlanos: manutencoes.length,
+        porTipo,
+        custoTotalPeriodo: porTipo.PREVENTIVA.custo + porTipo.PREDITIVA.custo + porTipo.CORRETIVA.custo,
+        manutencoesVencidas: vencidos.length,
+        manutencoesEmAlerta,
+      },
+      vencidos,
+      itens,
+    };
   }
 
   // ------------------------------------------------------------------

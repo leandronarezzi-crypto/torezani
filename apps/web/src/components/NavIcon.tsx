@@ -77,6 +77,18 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M3 17l9 4 9-4" />
     </>
   ),
+  manutencao: (
+    <>
+      <path d="M21 7.5a4.5 4.5 0 0 1-6.36 4.1L7 19.25 4.75 17l7.65-7.64A4.5 4.5 0 0 1 18.5 3l-3 3 1.5 1.5 3-3c.6.6 1 1.5 1 2.5Z" />
+    </>
+  ),
+  'ordem-servico': (
+    <>
+      <rect x="6" y="4" width="12" height="17" rx="1.5" />
+      <path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z" />
+      <path d="m9 13 2 2 4-4" />
+    </>
+  ),
 };
 
 export function NavIcon({ name, className = 'h-[18px] w-[18px]' }: { name: string; className?: string }) {
