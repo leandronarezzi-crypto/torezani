@@ -1,10 +1,17 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { TipoManutencao } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertManutencaoDto } from './dto/upsert-manutencao.dto';
 import { RegistrarServicoDto } from './dto/registrar-servico.dto';
 import { toNumber } from '../common/decimal';
 import { computeManutencaoStatus } from '../common/alert-calculators';
 import type { AuthUser } from '../common/types/auth-user';
+
+const TIPO_MANUTENCAO_LABEL: Record<TipoManutencao, string> = {
+  PREVENTIVA: 'Preventiva',
+  PREDITIVA: 'Preditiva',
+  CORRETIVA: 'Corretiva',
+};
 
 /**
  * Chave de comparacao entre servicos: ignora acentos, maiusculas,
@@ -14,23 +21,36 @@ import type { AuthUser } from '../common/types/auth-user';
 export function chaveServico(tipoServico: string): string {
   return String(tipoServico ?? '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\p{Diacritic}/gu, '')
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, ' ')
     .trim();
 }
 
 function annotate(
-  m: { horimetroUltimaTroca: unknown; intervaloHoras: number; alertaLimiteHoras: number; [key: string]: unknown },
+  m: {
+    tipo: TipoManutencao;
+    horimetroUltimaTroca: unknown;
+    intervaloHoras: number | null;
+    alertaLimiteHoras: number;
+    [key: string]: unknown;
+  },
   horimetroAtual: number,
 ) {
+  const base = { ...m, horimetroUltimaTroca: toNumber(m.horimetroUltimaTroca as any) };
+
+  // Preditiva/Corretiva sao eventos pontuais: nao ha "proxima troca" a acompanhar.
+  if (m.tipo !== 'PREVENTIVA' || m.intervaloHoras == null) {
+    return { ...base, proximaTroca: null, horasRestantes: null, status: 'N/A' as const };
+  }
+
   const { proximaTroca, horasRestantes, status } = computeManutencaoStatus(
     horimetroAtual,
     Number(m.horimetroUltimaTroca),
     m.intervaloHoras,
     m.alertaLimiteHoras,
   );
-  return { ...m, horimetroUltimaTroca: toNumber(m.horimetroUltimaTroca as any), proximaTroca, horasRestantes, status };
+  return { ...base, proximaTroca, horasRestantes, status };
 }
 
 @Injectable()
@@ -63,18 +83,56 @@ export class ManutencoesService implements OnModuleInit {
   // ------------------------------------------------------------------
 
   /**
-   * Cria um plano de manutencao. Se ja existir o MESMO servico no MESMO motor,
-   * nao cria duplicata: registra a troca informada no plano existente.
+   * Cria uma manutencao no motor.
+   *
+   * PREVENTIVA: cria (ou reaproveita) um plano recorrente com intervalo de horas.
+   * Se ja existir o MESMO servico do MESMO tipo no MESMO motor, nao cria duplicata:
+   * registra a troca informada no plano existente.
+   *
+   * PREDITIVA/CORRETIVA: sao eventos pontuais (o cadastro ja E o registro da
+   * ocorrencia) — sempre gera uma linha de historico, e uma Despesa automatica
+   * se um custo for informado.
    */
   async create(motorId: number, dto: UpsertManutencaoDto, usuario?: AuthUser) {
     const motor = await this.prisma.motor.findUnique({ where: { id: motorId } });
     if (!motor) throw new NotFoundException('Motor não encontrado');
 
     const horimetroMotor = toNumber(motor.horimetroAtual) ?? 0;
+    const tipo = dto.tipo ?? 'PREVENTIVA';
     const chave = chaveServico(dto.tipoServico);
 
     const existentes = await this.prisma.manutencaoPreventiva.findMany({ where: { motorId } });
-    const jaExiste = existentes.find((m) => chaveServico(m.tipoServico) === chave);
+    const jaExiste = existentes.find((m) => chaveServico(m.tipoServico) === chave && m.tipo === tipo);
+
+    if (tipo !== 'PREVENTIVA') {
+      const horimetroEvento = dto.horimetroUltimaTroca ?? horimetroMotor;
+      const manutencaoId = jaExiste
+        ? jaExiste.id
+        : (
+            await this.prisma.manutencaoPreventiva.create({
+              data: {
+                motorId,
+                tipo,
+                tipoServico: dto.tipoServico.trim(),
+                horimetroUltimaTroca: horimetroEvento,
+                intervaloHoras: null,
+                alertaLimiteHoras: 0,
+              },
+            })
+          ).id;
+
+      return this.registrarServico(
+        manutencaoId,
+        {
+          horimetro: horimetroEvento,
+          dataExecucao: dto.dataExecucao,
+          observacoes: dto.observacoes,
+          custo: dto.custo,
+          fornecedor: dto.fornecedor,
+        },
+        usuario,
+      );
+    }
 
     if (jaExiste) {
       const novoHorimetro = dto.horimetroUltimaTroca ?? horimetroMotor;
@@ -87,9 +145,14 @@ export class ManutencoesService implements OnModuleInit {
       return annotate(jaExiste, horimetroMotor);
     }
 
+    if (dto.intervaloHoras == null) {
+      throw new BadRequestException('intervaloHoras é obrigatório para manutenção Preventiva');
+    }
+
     const manutencao = await this.prisma.manutencaoPreventiva.create({
       data: {
         motorId,
+        tipo: 'PREVENTIVA',
         tipoServico: dto.tipoServico.trim(),
         horimetroUltimaTroca: dto.horimetroUltimaTroca ?? 0,
         intervaloHoras: dto.intervaloHoras,
@@ -120,12 +183,18 @@ export class ManutencoesService implements OnModuleInit {
     const existing = await this.prisma.manutencaoPreventiva.findUnique({ where: { id }, include: { motor: true } });
     if (!existing) throw new NotFoundException('Manutenção não encontrada');
 
+    const tipo = dto.tipo ?? existing.tipo;
+    if (tipo === 'PREVENTIVA' && dto.intervaloHoras == null && existing.intervaloHoras == null) {
+      throw new BadRequestException('intervaloHoras é obrigatório para manutenção Preventiva');
+    }
+
     const manutencao = await this.prisma.manutencaoPreventiva.update({
       where: { id },
       data: {
+        tipo,
         tipoServico: dto.tipoServico.trim(),
         horimetroUltimaTroca: dto.horimetroUltimaTroca ?? 0,
-        intervaloHoras: dto.intervaloHoras,
+        intervaloHoras: tipo === 'PREVENTIVA' ? (dto.intervaloHoras ?? existing.intervaloHoras) : null,
         alertaLimiteHoras: dto.alertaLimiteHoras ?? 0,
       },
     });
@@ -141,6 +210,10 @@ export class ManutencoesService implements OnModuleInit {
   /**
    * Registra a execucao do servico. O historico e PRESERVADO: cria uma linha
    * em execucao_manutencao antes de atualizar o horimetro do plano.
+   *
+   * Se a manutencao for Preditiva/Corretiva e um custo for informado, gera
+   * uma Despesa automaticamente (categoria Motor, vinculada a embarcacao) —
+   * sem precisar de lancamento manual duplicado no Financeiro.
    */
   async registrarServico(id: number, dto: RegistrarServicoDto, usuario?: AuthUser) {
     const manutencao = await this.prisma.manutencaoPreventiva.findUnique({ where: { id }, include: { motor: true } });
@@ -148,19 +221,37 @@ export class ManutencoesService implements OnModuleInit {
 
     const horimetroAtual = toNumber(manutencao.motor.horimetroAtual) ?? 0;
     const novoValor = dto.horimetro ?? horimetroAtual;
+    const dataExecucao = dto.dataExecucao ? new Date(dto.dataExecucao) : new Date();
 
     const atualizada = await this.prisma.$transaction(async (tx) => {
-      await tx.execucaoManutencao.create({
+      const execucao = await tx.execucaoManutencao.create({
         data: {
           manutencaoId: id,
           horimetro: novoValor,
-          dataExecucao: dto.dataExecucao ? new Date(dto.dataExecucao) : new Date(),
+          dataExecucao,
           observacoes: dto.observacoes?.trim() || null,
           origem: 'REGISTRO',
           registradoPorId: usuario?.id ?? null,
           registradoPorNome: usuario?.nome ?? null,
+          custo: dto.custo ?? null,
+          fornecedor: dto.fornecedor?.trim() || null,
         },
       });
+
+      if (manutencao.tipo !== 'PREVENTIVA' && dto.custo != null && dto.custo > 0) {
+        const despesa = await tx.despesa.create({
+          data: {
+            categoria: 'MOTOR',
+            embarcacaoId: manutencao.motor.embarcacaoId,
+            fornecedor: dto.fornecedor?.trim() || null,
+            valor: dto.custo,
+            data: dataExecucao,
+            observacoes: `Gerada automaticamente pela manutenção ${TIPO_MANUTENCAO_LABEL[manutencao.tipo]}: ${manutencao.tipoServico}.`,
+          },
+        });
+        await tx.execucaoManutencao.update({ where: { id: execucao.id }, data: { despesaId: despesa.id } });
+      }
+
       return tx.manutencaoPreventiva.update({
         where: { id },
         data: { horimetroUltimaTroca: novoValor },
@@ -179,7 +270,7 @@ export class ManutencoesService implements OnModuleInit {
       where: { manutencaoId: id },
       orderBy: [{ dataExecucao: 'desc' }, { id: 'desc' }],
     });
-    return execucoes.map((e) => ({ ...e, horimetro: toNumber(e.horimetro) }));
+    return execucoes.map((e) => ({ ...e, horimetro: toNumber(e.horimetro), custo: toNumber(e.custo) }));
   }
 
   // ------------------------------------------------------------------
@@ -188,7 +279,7 @@ export class ManutencoesService implements OnModuleInit {
 
   /**
    * 1. Garante uma linha de historico para a ultima troca de cada plano.
-   * 2. Mescla planos duplicados (mesmo motor + mesmo servico): mantem o de
+   * 2. Mescla planos duplicados (mesmo motor + mesmo servico + mesmo tipo): mantem o de
    *    horimetro mais alto e converte os demais em linhas de historico.
    *
    * Nenhuma informacao e perdida: o horimetro do plano removido vira execucao.
@@ -221,10 +312,10 @@ export class ManutencoesService implements OnModuleInit {
       execucoesCriadas++;
     }
 
-    // Passo 2 — mesclar duplicatas.
+    // Passo 2 — mesclar duplicatas (mesmo motor, mesmo servico E mesmo tipo).
     const grupos = new Map<string, typeof planos>();
     for (const plano of planos) {
-      const chave = `${plano.motorId}::${chaveServico(plano.tipoServico)}`;
+      const chave = `${plano.motorId}::${plano.tipo}::${chaveServico(plano.tipoServico)}`;
       const lista = grupos.get(chave) ?? [];
       lista.push(plano);
       grupos.set(chave, lista);

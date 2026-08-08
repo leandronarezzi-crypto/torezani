@@ -13,14 +13,24 @@ function serializeMotor(motor: { horimetroAtual: unknown; [key: string]: unknown
   return { ...motor, horimetroAtual: toNumber(motor.horimetroAtual as any) };
 }
 
-function serializeManutencao(m: { horimetroUltimaTroca: unknown; [key: string]: unknown }, horimetroAtual: number) {
+function serializeManutencao(
+  m: { tipo: string; horimetroUltimaTroca: unknown; intervaloHoras: number | null; alertaLimiteHoras: number; [key: string]: unknown },
+  horimetroAtual: number,
+) {
+  const base = { ...m, horimetroUltimaTroca: toNumber(m.horimetroUltimaTroca as any) };
+
+  // Preditiva/Corretiva sao eventos pontuais: nao ha "proxima troca" a calcular.
+  if (m.tipo !== 'PREVENTIVA' || m.intervaloHoras == null) {
+    return { ...base, proximaTroca: null, horasRestantes: null, status: 'N/A' as const };
+  }
+
   const { proximaTroca, horasRestantes, status } = computeManutencaoStatus(
     horimetroAtual,
     Number(m.horimetroUltimaTroca),
-    m.intervaloHoras as number,
-    m.alertaLimiteHoras as number,
+    m.intervaloHoras,
+    m.alertaLimiteHoras,
   );
-  return { ...m, horimetroUltimaTroca: toNumber(m.horimetroUltimaTroca as any), proximaTroca, horasRestantes, status };
+  return { ...base, proximaTroca, horasRestantes, status };
 }
 
 @Injectable()

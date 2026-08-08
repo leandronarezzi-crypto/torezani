@@ -46,7 +46,8 @@ export class NotificationsService {
   async getAlertas(): Promise<{ resumo: Record<string, number>; manutencoes: ManutencaoAlerta[]; cascoPintura: CascoPinturaAlerta[] }> {
     // Embarcacoes excluidas (exclusao logica) nao geram alerta nem notificacao.
     const manutencaoRows = await this.prisma.manutencaoPreventiva.findMany({
-      where: { motor: { embarcacao: { excluidoEm: null } } },
+      // Preditiva/Corretiva sao eventos pontuais ja resolvidos: nao entram no calculo de vencimento.
+      where: { tipo: 'PREVENTIVA', motor: { embarcacao: { excluidoEm: null } } },
       include: { motor: { include: { embarcacao: true } } },
     });
 
@@ -56,7 +57,7 @@ export class NotificationsService {
         const { proximaTroca, horasRestantes, status } = computeManutencaoStatus(
           horimetroAtual,
           Number(row.horimetroUltimaTroca),
-          row.intervaloHoras,
+          Number(row.intervaloHoras),
           row.alertaLimiteHoras,
         );
         return {

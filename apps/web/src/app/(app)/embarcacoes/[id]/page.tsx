@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Fragment, use, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFetch } from '@/lib/useFetch';
@@ -11,13 +11,18 @@ import { formatDate, formatNumber } from '@/lib/format';
 import {
   POSICAO_LABEL,
   TIPO_CONFIGURACAO_LABEL,
+  TIPO_MANUTENCAO_LABEL,
+  TIPO_MANUTENCAO_TONE,
   type AuditoriaResumo,
   type Correia,
   type EmbarcacaoDetalhada,
   type ManutencaoCascoPintura,
   type ManutencaoPreventiva,
   type MotorDetalhado,
+  type TipoManutencao,
 } from '@/lib/types';
+
+const TIPOS_MANUTENCAO: TipoManutencao[] = ['PREVENTIVA', 'PREDITIVA', 'CORRETIVA'];
 
 export default function EmbarcacaoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -545,8 +550,17 @@ type EstadoModalManutencao = { modo: 'novo' } | { modo: 'editar'; manutencao: Ma
 
 function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: () => void }) {
   const [modal, setModal] = useState<EstadoModalManutencao>(null);
+  const [tipoForm, setTipoForm] = useState<TipoManutencao>('PREVENTIVA');
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  const [modalRegistro, setModalRegistro] = useState<ManutencaoPreventiva | null>(null);
+  const [salvandoRegistro, setSalvandoRegistro] = useState(false);
+  const [erroRegistro, setErroRegistro] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTipoForm(modal?.modo === 'editar' ? modal.manutencao.tipo : 'PREVENTIVA');
+  }, [modal]);
 
   async function salvar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -554,12 +568,22 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
     setSalvando(true);
     setErro(null);
     const form = new FormData(e.currentTarget);
-    const payload = {
+    const tipo = form.get('tipo') as TipoManutencao;
+    const payload: Record<string, unknown> = {
       tipoServico: form.get('tipoServico'),
+      tipo,
       horimetroUltimaTroca: Number(form.get('horimetroUltimaTroca')) || 0,
-      intervaloHoras: Number(form.get('intervaloHoras')),
-      alertaLimiteHoras: Number(form.get('alertaLimiteHoras')) || 0,
     };
+    if (tipo === 'PREVENTIVA') {
+      payload.intervaloHoras = Number(form.get('intervaloHoras'));
+      payload.alertaLimiteHoras = Number(form.get('alertaLimiteHoras')) || 0;
+    } else if (modal.modo === 'novo') {
+      // So no cadastro: Preditiva/Corretiva ja nascem com o evento registrado.
+      payload.dataExecucao = form.get('dataExecucao') || undefined;
+      payload.observacoes = form.get('observacoes') || undefined;
+      payload.custo = form.get('custo') ? Number(form.get('custo')) : undefined;
+      payload.fornecedor = form.get('fornecedor') || undefined;
+    }
     try {
       if (modal.modo === 'novo') {
         await api.post(`/motores/${motor.id}/manutencoes`, payload);
@@ -581,16 +605,33 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
     refetch();
   }
 
-  async function registrarServico(m: ManutencaoPreventiva) {
-    if (!window.confirm(`Registrar serviço de "${m.tipoServico}" com o horímetro atual (${formatNumber(motor.horimetroAtual)} h)?`)) return;
-    await api.patch(`/manutencoes/${m.id}/registrar-servico`);
-    refetch();
+  async function salvarRegistro(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!modalRegistro) return;
+    setSalvandoRegistro(true);
+    setErroRegistro(null);
+    const form = new FormData(e.currentTarget);
+    try {
+      await api.patch(`/manutencoes/${modalRegistro.id}/registrar-servico`, {
+        horimetro: form.get('horimetro') ? Number(form.get('horimetro')) : undefined,
+        dataExecucao: form.get('dataExecucao') || undefined,
+        observacoes: form.get('observacoes') || undefined,
+        custo: form.get('custo') ? Number(form.get('custo')) : undefined,
+        fornecedor: form.get('fornecedor') || undefined,
+      });
+      setModalRegistro(null);
+      refetch();
+    } catch (err) {
+      setErroRegistro(err instanceof ApiError ? err.message : 'Não foi possível registrar o serviço.');
+    } finally {
+      setSalvandoRegistro(false);
+    }
   }
 
   return (
     <div className="mt-6 rounded-xl border border-line bg-card p-5">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold text-foreground">Manutenção Preventiva</h3>
+        <h3 className="font-semibold text-foreground">Manutenção</h3>
         <button
           onClick={() => setModal({ modo: 'novo' })}
           className="write-only rounded px-2 py-1 text-xs font-semibold text-accent hover:bg-accent-soft"
@@ -603,6 +644,7 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
           <thead className="text-xs uppercase text-foreground-soft">
             <tr>
               <th className="py-1">Serviço</th>
+              <th className="py-1">Tipo</th>
               <th className="py-1">Última Troca</th>
               <th className="py-1">Intervalo</th>
               <th className="py-1">Próxima Troca</th>
@@ -614,7 +656,7 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
           <tbody>
             {motor.manutencoes.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-4 text-center text-sm text-foreground-soft">
+                <td colSpan={8} className="py-4 text-center text-sm text-foreground-soft">
                   Nenhuma manutenção cadastrada.
                 </td>
               </tr>
@@ -622,15 +664,18 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
               motor.manutencoes.map((m) => (
                 <tr key={m.id} className="border-t border-line">
                   <td className="py-2">{m.tipoServico}</td>
+                  <td className="py-2">
+                    <Badge tone={TIPO_MANUTENCAO_TONE[m.tipo]}>{TIPO_MANUTENCAO_LABEL[m.tipo]}</Badge>
+                  </td>
                   <td className="py-2">{formatNumber(m.horimetroUltimaTroca)} h</td>
-                  <td className="py-2">{m.intervaloHoras} h</td>
-                  <td className="py-2">{formatNumber(m.proximaTroca)} h</td>
-                  <td className="py-2">{formatNumber(m.horasRestantes)} h</td>
+                  <td className="py-2">{m.intervaloHoras != null ? `${m.intervaloHoras} h` : '—'}</td>
+                  <td className="py-2">{m.proximaTroca != null ? `${formatNumber(m.proximaTroca)} h` : '—'}</td>
+                  <td className="py-2">{m.horasRestantes != null ? `${formatNumber(m.horasRestantes)} h` : '—'}</td>
                   <td className="py-2">
                     <StatusDot status={m.status} />
                   </td>
                   <td className="space-x-2 whitespace-nowrap py-2 text-right">
-                    <button onClick={() => registrarServico(m)} className="write-only text-xs font-semibold text-success hover:underline">
+                    <button onClick={() => setModalRegistro(m)} className="write-only text-xs font-semibold text-success hover:underline">
                       Registrar Serviço
                     </button>
                     <button onClick={() => setModal({ modo: 'editar', manutencao: m })} className="write-only text-xs text-foreground-soft hover:text-accent">
@@ -660,43 +705,119 @@ function MaintenanceCard({ motor, refetch }: { motor: MotorDetalhado; refetch: (
             <input
               name="tipoServico"
               required
-              placeholder="Ex: Óleo do motor, Filtro diesel"
+              placeholder="Ex: Óleo do motor, Filtro diesel, Vazamento na bomba"
               defaultValue={modal.modo === 'editar' ? modal.manutencao.tipoServico : ''}
               className={CAMPO_CLASSE}
             />
           </div>
           <div>
-            <label className={LABEL_CLASSE}>Horímetro da Última Troca</label>
+            <label className={LABEL_CLASSE}>Tipo</label>
+            <select name="tipo" value={tipoForm} onChange={(e) => setTipoForm(e.target.value as TipoManutencao)} className={CAMPO_CLASSE}>
+              {TIPOS_MANUTENCAO.map((t) => (
+                <option key={t} value={t}>
+                  {TIPO_MANUTENCAO_LABEL[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={LABEL_CLASSE}>{tipoForm === 'PREVENTIVA' ? 'Horímetro da Última Troca' : 'Horímetro no Momento'}</label>
             <input
               type="number"
               step="0.01"
               min={0}
               name="horimetroUltimaTroca"
-              defaultValue={modal.modo === 'editar' ? modal.manutencao.horimetroUltimaTroca : 0}
+              defaultValue={modal.modo === 'editar' ? modal.manutencao.horimetroUltimaTroca : motor.horimetroAtual}
               className={CAMPO_CLASSE}
             />
+          </div>
+
+          {tipoForm === 'PREVENTIVA' ? (
+            <Fragment key="preventiva">
+              <div>
+                <label className={LABEL_CLASSE}>Intervalo (horas)</label>
+                <input
+                  type="number"
+                  min={1}
+                  name="intervaloHoras"
+                  required
+                  defaultValue={modal.modo === 'editar' ? (modal.manutencao.intervaloHoras ?? '') : ''}
+                  className={CAMPO_CLASSE}
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLASSE}>Alertar quando faltar (horas)</label>
+                <input
+                  type="number"
+                  min={0}
+                  name="alertaLimiteHoras"
+                  defaultValue={modal.modo === 'editar' ? modal.manutencao.alertaLimiteHoras : 50}
+                  className={CAMPO_CLASSE}
+                />
+              </div>
+            </Fragment>
+          ) : modal.modo === 'novo' ? (
+            <Fragment key="evento">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={LABEL_CLASSE}>Data</label>
+                  <input type="date" name="dataExecucao" defaultValue={new Date().toISOString().slice(0, 10)} className={CAMPO_CLASSE} />
+                </div>
+                <div>
+                  <label className={LABEL_CLASSE}>Custo</label>
+                  <input type="number" step="0.01" min={0} name="custo" className={CAMPO_CLASSE} />
+                </div>
+              </div>
+              <div>
+                <label className={LABEL_CLASSE}>Fornecedor / Oficina</label>
+                <input name="fornecedor" className={CAMPO_CLASSE} />
+              </div>
+              <div>
+                <label className={LABEL_CLASSE}>O que aconteceu / foi feito</label>
+                <textarea name="observacoes" rows={3} className={CAMPO_CLASSE} />
+              </div>
+              <p className="text-xs text-foreground-soft">Se o custo for informado, uma Despesa é gerada automaticamente no Financeiro.</p>
+            </Fragment>
+          ) : null}
+        </ModalCadastro>
+      ) : null}
+
+      {modalRegistro ? (
+        <ModalCadastro
+          titulo={`Registrar Serviço — ${modalRegistro.tipoServico}`}
+          subtitulo={`Horímetro atual do motor: ${formatNumber(motor.horimetroAtual)} h`}
+          onFechar={() => setModalRegistro(null)}
+          onSubmit={salvarRegistro}
+          salvando={salvandoRegistro}
+          erro={erroRegistro}
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={LABEL_CLASSE}>Horímetro</label>
+              <input type="number" step="0.01" min={0} name="horimetro" defaultValue={motor.horimetroAtual} className={CAMPO_CLASSE} />
+            </div>
+            <div>
+              <label className={LABEL_CLASSE}>Data</label>
+              <input type="date" name="dataExecucao" defaultValue={new Date().toISOString().slice(0, 10)} className={CAMPO_CLASSE} />
+            </div>
           </div>
           <div>
-            <label className={LABEL_CLASSE}>Intervalo (horas)</label>
-            <input
-              type="number"
-              min={1}
-              name="intervaloHoras"
-              required
-              defaultValue={modal.modo === 'editar' ? modal.manutencao.intervaloHoras : ''}
-              className={CAMPO_CLASSE}
-            />
+            <label className={LABEL_CLASSE}>Observações</label>
+            <textarea name="observacoes" rows={2} className={CAMPO_CLASSE} />
           </div>
-          <div>
-            <label className={LABEL_CLASSE}>Alertar quando faltar (horas)</label>
-            <input
-              type="number"
-              min={0}
-              name="alertaLimiteHoras"
-              defaultValue={modal.modo === 'editar' ? modal.manutencao.alertaLimiteHoras : 50}
-              className={CAMPO_CLASSE}
-            />
-          </div>
+          {modalRegistro.tipo !== 'PREVENTIVA' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={LABEL_CLASSE}>Custo</label>
+                <input type="number" step="0.01" min={0} name="custo" className={CAMPO_CLASSE} />
+                <p className="mt-1 text-xs text-foreground-soft">Se informado, gera uma despesa automaticamente.</p>
+              </div>
+              <div>
+                <label className={LABEL_CLASSE}>Fornecedor / Oficina</label>
+                <input name="fornecedor" className={CAMPO_CLASSE} />
+              </div>
+            </div>
+          ) : null}
         </ModalCadastro>
       ) : null}
     </div>

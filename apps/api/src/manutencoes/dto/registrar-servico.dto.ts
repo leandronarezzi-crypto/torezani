@@ -20,4 +20,17 @@ export class RegistrarServicoDto {
   @IsString()
   @MaxLength(2000)
   observacoes?: string;
+
+  @ApiPropertyOptional({ description: 'Custo do servico. Se informado em Preditiva/Corretiva, gera uma Despesa automaticamente.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  custo?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  fornecedor?: string;
 }

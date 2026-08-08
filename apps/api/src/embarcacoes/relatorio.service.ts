@@ -64,18 +64,18 @@ export class RelatorioService {
       const horimetroAtual = toNumber(motor.horimetroAtual) ?? 0;
 
       const manutencoes = motor.manutencoes.map((m) => {
-        const calc = computeManutencaoStatus(
-          horimetroAtual,
-          Number(m.horimetroUltimaTroca),
-          m.intervaloHoras,
-          m.alertaLimiteHoras,
-        );
+        // Preditiva/Corretiva sao eventos pontuais: nao ha "proxima troca" a calcular.
+        const calc =
+          m.tipo === 'PREVENTIVA' && m.intervaloHoras != null
+            ? computeManutencaoStatus(horimetroAtual, Number(m.horimetroUltimaTroca), m.intervaloHoras, m.alertaLimiteHoras)
+            : { proximaTroca: null as number | null, horasRestantes: null as number | null, status: 'N/A' as const };
         if (calc.status === 'VENCIDO') totalVencidas++;
         if (calc.status === 'ALERTA') totalAlerta++;
         totalExecucoes += m.execucoes.length;
 
         return {
           id: m.id,
+          tipo: m.tipo,
           tipoServico: m.tipoServico,
           intervaloHoras: m.intervaloHoras,
           alertaLimiteHoras: m.alertaLimiteHoras,
@@ -90,6 +90,8 @@ export class RelatorioService {
             observacoes: e.observacoes,
             origem: e.origem,
             registradoPor: e.registradoPorNome,
+            custo: toNumber(e.custo),
+            fornecedor: e.fornecedor,
           })),
         };
       });

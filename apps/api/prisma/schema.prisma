@@ -47,6 +47,12 @@ enum StatusReceita {
   EM_ATRASO
 }
 
+enum TipoManutencao {
+  PREVENTIVA
+  PREDITIVA
+  CORRETIVA
+}
+
 enum CategoriaDespesa {
   COMBUSTIVEL
   LUBRIFICANTES
@@ -208,14 +214,16 @@ model Correia {
 }
 
 model ManutencaoPreventiva {
-  id                   Int      @id @default(autoincrement())
-  motorId              Int      @map("motor_id")
-  tipoServico          String   @map("tipo_servico") @db.VarChar(255)
-  horimetroUltimaTroca Decimal  @default(0.00) @map("horimetro_ultima_troca") @db.Decimal(10, 2)
-  intervaloHoras       Int      @map("intervalo_horas")
-  alertaLimiteHoras    Int      @default(0) @map("alerta_limite_horas")
-  criadoEm             DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  atualizadoEm         DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
+  id                   Int             @id @default(autoincrement())
+  motorId              Int             @map("motor_id")
+  tipo                 TipoManutencao  @default(PREVENTIVA)
+  tipoServico          String          @map("tipo_servico") @db.VarChar(255)
+  horimetroUltimaTroca Decimal         @default(0.00) @map("horimetro_ultima_troca") @db.Decimal(10, 2)
+  /// So obrigatorio para tipo PREVENTIVA. Preditiva/Corretiva sao eventos pontuais, sem "proxima troca".
+  intervaloHoras       Int?            @map("intervalo_horas")
+  alertaLimiteHoras    Int             @default(0) @map("alerta_limite_horas")
+  criadoEm             DateTime        @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm         DateTime        @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz
 
   motor     Motor                @relation(fields: [motorId], references: [id], onDelete: Cascade)
   execucoes ExecucaoManutencao[]
@@ -236,10 +244,15 @@ model ExecucaoManutencao {
   origem            String   @default("REGISTRO") @db.VarChar(20)
   registradoPorId   Int?     @map("registrado_por_id")
   registradoPorNome String?  @map("registrado_por_nome") @db.VarChar(150)
+  /// Custo do servico (usado sobretudo em Preditiva/Corretiva). Se preenchido, gera uma Despesa automaticamente.
+  custo             Decimal? @db.Decimal(12, 2)
+  fornecedor        String?  @db.VarChar(150)
+  despesaId         Int?     @unique @map("despesa_id")
   criadoEm          DateTime @default(now()) @map("criado_em") @db.Timestamptz
 
   manutencao    ManutencaoPreventiva @relation(fields: [manutencaoId], references: [id], onDelete: Cascade)
   registradoPor Usuario?             @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
+  despesa       Despesa?             @relation(fields: [despesaId], references: [id], onDelete: SetNull)
 
   @@index([manutencaoId])
   @@index([dataExecucao])
@@ -396,6 +409,8 @@ model Despesa {
 
   embarcacao  Embarcacao?  @relation(fields: [embarcacaoId], references: [id], onDelete: SetNull)
   centroCusto CentroCusto? @relation(fields: [centroCustoId], references: [id], onDelete: SetNull)
+  /// Preenchido quando a despesa foi gerada automaticamente por um registro de manutencao Preditiva/Corretiva.
+  execucaoManutencao ExecucaoManutencao?
 
   @@index([embarcacaoId])
   @@index([centroCustoId])

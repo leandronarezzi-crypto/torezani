@@ -17,6 +17,18 @@ export const TIPO_INTERVENCAO_LABEL: Record<TipoIntervencao, string> = {
   PINTURA: 'Pintura',
 };
 
+export type TipoManutencao = 'PREVENTIVA' | 'PREDITIVA' | 'CORRETIVA';
+export const TIPO_MANUTENCAO_LABEL: Record<TipoManutencao, string> = {
+  PREVENTIVA: 'Preventiva',
+  PREDITIVA: 'Preditiva',
+  CORRETIVA: 'Corretiva',
+};
+export const TIPO_MANUTENCAO_TONE: Record<TipoManutencao, 'good' | 'warn' | 'bad' | 'default'> = {
+  PREVENTIVA: 'good',
+  PREDITIVA: 'warn',
+  CORRETIVA: 'bad',
+};
+
 export type StatusAlerta = 'VENCIDO' | 'ALERTA' | 'OK' | 'N/A';
 export const STATUS_ALERTA_LABEL: Record<StatusAlerta, string> = {
   VENCIDO: 'Vencido',
@@ -100,12 +112,14 @@ export interface Correia {
 export interface ManutencaoPreventiva {
   id: number;
   motorId: number;
+  tipo: TipoManutencao;
   tipoServico: string;
   horimetroUltimaTroca: number;
-  intervaloHoras: number;
+  /** So preenchido para tipo PREVENTIVA. */
+  intervaloHoras: number | null;
   alertaLimiteHoras: number;
-  proximaTroca: number;
-  horasRestantes: number;
+  proximaTroca: number | null;
+  horasRestantes: number | null;
   status: StatusAlerta;
 }
 
@@ -252,16 +266,20 @@ export interface ExecucaoManutencao {
   observacoes: string | null;
   origem: string;
   registradoPor: string | null;
+  custo: number | null;
+  fornecedor: string | null;
+  despesaId?: number | null;
 }
 
 export interface ManutencaoRelatorio {
   id: number;
+  tipo: TipoManutencao;
   tipoServico: string;
-  intervaloHoras: number;
+  intervaloHoras: number | null;
   alertaLimiteHoras: number;
   horimetroUltimaTroca: number | null;
-  proximaTroca: number;
-  horasRestantes: number;
+  proximaTroca: number | null;
+  horasRestantes: number | null;
   status: StatusAlerta;
   execucoes: ExecucaoManutencao[];
 }
